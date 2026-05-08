@@ -1,0 +1,54 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Env (never commit secrets)
+.env
+.env.*
+*.env
+!.env.example
+*.local
+
+# Node / Vite
+node_modules/
+dist/
+dist-ssr/
+.vite/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Project artifacts
+*.faiss
+*.index
+*.pkl
+storage/
+backend/storage/
+google-tts-sa.json
+*.sqlite
+*.sqlite3
+*.db
+
+# Logs
+*.log
+
+# Claude / agent local state
+.claude/
+
+# Temp
+*.tmp
+*.bak
