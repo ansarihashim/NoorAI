@@ -5,9 +5,12 @@ Wire format:
     {"type": "start_narration", "doc_id": "..."}
     {"type": "stop"}
     {"type": "resume"}
+    {"type": "ping"}
   Inbound binary frames: int16 LE PCM, 16kHz mono, any chunk size.
 
   Outbound JSON:
+    {"type": "ready"}
+    {"type": "pong"}
     {"type": "state", "value": "narrating|listening|thinking|speaking|idle", "cursor": int}
     {"type": "transcript", "role": "user|narrator|assistant", "text": "...", "chunk_idx"?: int}
     {"type": "narration_cursor", "chunk_idx": int}
@@ -20,6 +23,8 @@ from __future__ import annotations
 
 import json
 import logging
+import time
+import uuid
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
@@ -31,7 +36,20 @@ router = APIRouter()
 
 @router.websocket("/ws/audio")
 async def ws_audio(ws: WebSocket) -> None:
-    await ws.accept()
+    conn_id = uuid.uuid4().hex[:8]
+    client = f"{ws.client.host}:{ws.client.port}" if ws.client else "?"
+    started = time.monotonic()
+    text_msgs = 0
+    bytes_frames = 0
+    bytes_total = 0
+
+    logger.info("ws[%s] connect from %s", conn_id, client)
+
+    try:
+        await ws.accept()
+    except Exception:
+        logger.exception("ws[%s] accept failed", conn_id)
+        return
 
     async def send_json(payload: dict) -> None:
         await ws.send_text(json.dumps(payload))
@@ -40,7 +58,11 @@ async def ws_audio(ws: WebSocket) -> None:
         await ws.send_bytes(data)
 
     session = Session(send_json=send_json, send_bytes=send_bytes)
-    await send_json({"type": "ready"})
+    try:
+        await send_json({"type": "ready"})
+    except Exception:
+        logger.exception("ws[%s] failed to send ready frame", conn_id)
+        return
 
     try:
         while True:
@@ -49,38 +71,63 @@ async def ws_audio(ws: WebSocket) -> None:
                 break
 
             if "bytes" in msg and msg["bytes"] is not None:
-                session.feed_audio(msg["bytes"])
+                payload = msg["bytes"]
+                bytes_frames += 1
+                bytes_total += len(payload)
+                session.feed_audio(payload)
                 continue
 
             if "text" in msg and msg["text"] is not None:
+                text_msgs += 1
                 try:
-                    payload = json.loads(msg["text"])
+                    obj = json.loads(msg["text"])
                 except json.JSONDecodeError:
+                    logger.warning("ws[%s] invalid json: %r", conn_id, msg["text"][:200])
                     await send_json({"type": "error", "message": "invalid json"})
                     continue
 
-                kind = payload.get("type")
+                kind = obj.get("type")
+                logger.debug("ws[%s] recv text type=%s", conn_id, kind)
+
                 if kind == "start_narration":
-                    doc_id = payload.get("doc_id")
+                    doc_id = obj.get("doc_id")
                     if not doc_id:
                         await send_json({"type": "error", "message": "missing doc_id"})
                         continue
-                    await session.start_narration(doc_id)
+                    try:
+                        await session.start_narration(doc_id)
+                    except Exception as exc:
+                        logger.exception("ws[%s] start_narration failed", conn_id)
+                        await send_json({"type": "error", "message": f"start_narration failed: {exc}"})
                 elif kind == "stop":
-                    await session.stop()
+                    try:
+                        await session.stop()
+                    except Exception:
+                        logger.exception("ws[%s] stop failed", conn_id)
                 elif kind == "resume":
-                    await session.resume()
+                    try:
+                        await session.resume()
+                    except Exception as exc:
+                        logger.exception("ws[%s] resume failed", conn_id)
+                        await send_json({"type": "error", "message": f"resume failed: {exc}"})
                 elif kind == "ping":
                     await send_json({"type": "pong"})
                 else:
+                    logger.warning("ws[%s] unknown type=%r", conn_id, kind)
                     await send_json({"type": "error", "message": f"unknown type: {kind}"})
 
-    except WebSocketDisconnect:
-        logger.info("client disconnected")
+    except WebSocketDisconnect as exc:
+        logger.info("ws[%s] disconnect code=%s", conn_id, getattr(exc, "code", "?"))
     except Exception:
-        logger.exception("ws_audio crashed")
+        logger.exception("ws[%s] handler crashed", conn_id)
     finally:
         try:
             await session.stop()
         except Exception:
-            pass
+            logger.exception("ws[%s] session.stop failed during cleanup", conn_id)
+
+        elapsed = time.monotonic() - started
+        logger.info(
+            "ws[%s] closed after %.2fs text_msgs=%d audio_frames=%d audio_bytes=%d",
+            conn_id, elapsed, text_msgs, bytes_frames, bytes_total,
+        )

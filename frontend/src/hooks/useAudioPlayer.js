@@ -82,7 +82,12 @@ export function useAudioPlayer() {
   const unlock = useCallback(async () => {
     const audio = audioElRef.current
     if (!audio) return
-    try { await audio.play() } catch {}
+    // Calling play() inside the user gesture is enough to satisfy autoplay
+    // policy. We must NOT await the returned promise — with MediaSource it
+    // only resolves once data is buffered, and that data only arrives after
+    // we've sent start_narration. Awaiting here deadlocks the Start flow.
+    const p = audio.play()
+    if (p && typeof p.catch === 'function') p.catch(() => {})
   }, [])
 
   return { push, flush, unlock }

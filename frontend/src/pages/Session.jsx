@@ -13,7 +13,9 @@ export default function Session() {
   const [serverState, setServerState] = useState('idle')
   const [messages, setMessages] = useState([])
   const [error, setError] = useState('')
+  const [warn, setWarn] = useState('')
   const [started, setStarted] = useState(false)
+  const [busy, setBusy] = useState(false)
 
   const player = useAudioPlayer()
 
@@ -50,23 +52,64 @@ export default function Session() {
 
   async function handleStart() {
     setError('')
-    await player.unlock()       // user gesture → audio context unlocked
-    await mic.start()           // mic permission
-    sendJson({ type: 'start_narration', doc_id: docId })
-    setStarted(true)
+    setWarn('')
+    setBusy(true)
+    try {
+      // 1. Unlock the audio element from this user gesture so MediaSource can play.
+      try {
+        await player.unlock()
+      } catch (err) {
+        console.error('[session] player.unlock failed', err)
+        setError(`audio init failed: ${err?.message || err}`)
+        return
+      }
+
+      // 2. Try to enable the mic. Failure is non-fatal — narration still works
+      //    without it, you just can't interrupt by speaking.
+      try {
+        await mic.start()
+      } catch (err) {
+        console.warn('[session] mic.start failed', err)
+        const name = err?.name || 'Error'
+        if (name === 'NotAllowedError') {
+          setWarn('Microphone permission denied. Narration will play, but you cannot interrupt by speaking.')
+        } else if (name === 'NotFoundError') {
+          setWarn('No microphone found. Narration will play, but you cannot interrupt by speaking.')
+        } else {
+          setWarn(`Mic unavailable (${name}). Narration will play without interruption support.`)
+        }
+      }
+
+      // 3. Tell the server to start narrating — this is what the user actually
+      //    came here for, so it runs even if the mic failed above.
+      if (status !== 'open') {
+        setError(`Cannot start: WebSocket is "${status}". Try refreshing.`)
+        return
+      }
+      sendJson({ type: 'start_narration', doc_id: docId })
+      setStarted(true)
+    } finally {
+      setBusy(false)
+    }
   }
 
   async function handleStop() {
-    sendJson({ type: 'stop' })
-    await mic.stop()
+    try { sendJson({ type: 'stop' }) } catch {}
+    try { await mic.stop() } catch {}
     setStarted(false)
   }
 
   // Stop everything on unmount
+  const startedRef = useRef(false)
+  useEffect(() => { startedRef.current = started }, [started])
   useEffect(() => () => {
-    try { sendJson({ type: 'stop' }) } catch {}
+    if (startedRef.current) {
+      try { sendJson({ type: 'stop' }) } catch {}
+    }
     mic.stop()
   }, [])
+
+  const startDisabled = status !== 'open' || busy
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -82,15 +125,20 @@ export default function Session() {
         <div className="flex items-center gap-6">
           <MicButton
             active={mic.active}
-            disabled={status !== 'open' || !started}
-            onClick={() => (mic.active ? mic.stop() : mic.start())}
+            disabled={!started}
+            onClick={() => (mic.active ? mic.stop() : mic.start().catch((e) => setWarn(`mic: ${e?.message || e}`)))}
           />
           <div className="flex-1">
             <WaveformViz level={mic.level} />
           </div>
           {!started ? (
-            <button onClick={handleStart} className="btn-primary" disabled={status !== 'open'}>
-              Start
+            <button
+              onClick={handleStart}
+              className="btn-primary"
+              disabled={startDisabled}
+              title={status !== 'open' ? `Waiting for connection (${status})` : 'Begin narration'}
+            >
+              {busy ? 'Starting…' : 'Start'}
             </button>
           ) : (
             <button onClick={handleStop} className="btn-ghost">
@@ -98,7 +146,16 @@ export default function Session() {
             </button>
           )}
         </div>
+
+        {status !== 'open' && (
+          <div className="text-xs text-amber-400">
+            WebSocket status: <span className="font-mono">{status}</span> — waiting for backend at{' '}
+            <span className="font-mono">{import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws/audio'}</span>
+          </div>
+        )}
+        {warn && <div className="text-sm text-amber-400">{warn}</div>}
         {error && <div className="text-sm text-red-400">{error}</div>}
+
         <p className="text-xs text-slate-500">
           Tip: speak naturally during narration to interrupt and ask a question. Narration resumes after the answer.
         </p>

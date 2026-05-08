@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -7,14 +8,36 @@ from backend.config.settings import get_settings
 from backend.routes import audio, llm, tts, upload
 
 
+def _configure_logging() -> None:
+    """Idempotent logging setup. Avoid clobbering uvicorn's handlers."""
+    root = logging.getLogger()
+    if not root.handlers:
+        logging.basicConfig(
+            level=logging.INFO,
+            format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+            datefmt="%H:%M:%S",
+        )
+    else:
+        root.setLevel(logging.INFO)
+    # Make our app loggers chatty enough to see WS lifecycle.
+    logging.getLogger("backend").setLevel(logging.INFO)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    _configure_logging()
     settings = get_settings()
-    settings.storage_path
+    settings.storage_path  # ensure dir exists
+    logging.getLogger(__name__).info(
+        "EchoVerse starting env=%s cors=%s storage=%s",
+        settings.app_env, settings.cors_origin_list, settings.storage_path,
+    )
     yield
+    logging.getLogger(__name__).info("EchoVerse shutdown complete")
 
 
 def create_app() -> FastAPI:
+    _configure_logging()
     settings = get_settings()
     app = FastAPI(
         title="EchoVerse",
