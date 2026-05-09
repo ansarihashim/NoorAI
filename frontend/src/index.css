@@ -6,23 +6,80 @@
   html, body, #root {
     height: 100%;
   }
+  html {
+    color-scheme: dark;
+  }
   body {
     background: radial-gradient(ellipse at top, #1a1f3f 0%, #0a0d1a 60%);
     min-height: 100vh;
+    font-feature-settings: 'cv11', 'ss01', 'ss03';
+    -webkit-font-smoothing: antialiased;
+  }
+  /* faint film grain for perceived depth — pure CSS, no asset cost */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.04;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml;utf8,<svg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.45'/></svg>");
+  }
+  #root {
+    position: relative;
+    z-index: 1;
+  }
+  ::selection {
+    background: rgba(139, 92, 246, 0.35);
+    color: #fff;
+  }
+  *:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px #0a0d1a, 0 0 0 4px rgba(139, 92, 246, 0.55);
+    border-radius: 6px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 }
 
 @layer components {
   .glass {
-    @apply bg-bg-card/70 backdrop-blur border border-white/5 rounded-2xl;
+    @apply bg-surface-raised/70 backdrop-blur-xl border border-white/[0.06] rounded-card shadow-hairline;
   }
+  .glass-strong {
+    @apply bg-surface-raised/85 backdrop-blur-2xl border border-white/[0.08] rounded-card;
+  }
+  .hairline {
+    @apply border border-white/[0.06];
+  }
+  /* legacy classes kept while older components are still in tree */
   .btn {
-    @apply px-4 py-2 rounded-lg font-medium transition disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-250 ease-expo disabled:opacity-50 disabled:cursor-not-allowed;
   }
   .btn-primary {
-    @apply btn bg-accent-purple hover:bg-accent-purple/90 text-white;
+    @apply btn bg-accent-purple hover:bg-accent-purple-soft text-white;
   }
   .btn-ghost {
     @apply btn bg-white/5 hover:bg-white/10 text-slate-100;
+  }
+  .text-balance { text-wrap: balance; }
+  .text-pretty { text-wrap: pretty; }
+
+  /* Shimmer used in skeletons */
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      rgba(255,255,255,0.04) 0%,
+      rgba(255,255,255,0.10) 50%,
+      rgba(255,255,255,0.04) 100%
+    );
+    background-size: 200% 100%;
+    @apply animate-shimmer;
   }
 }

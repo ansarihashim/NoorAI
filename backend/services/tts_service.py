@@ -68,8 +68,12 @@ class TtsService:
         )
 
     # ---- public ----
-    async def synthesize_stream(self, text: str) -> AsyncIterator[bytes]:
-        """Yield MP3 byte chunks for the given text, falling through providers."""
+    async def synthesize_stream(self, text: str, voice_id: str | None = None) -> AsyncIterator[bytes]:
+        """Yield MP3 byte chunks for the given text, falling through providers.
+
+        If ``voice_id`` is provided, ElevenLabs uses it instead of the default.
+        Google + Edge fallbacks ignore voice_id (they don't share IDs).
+        """
         text = text.strip()
         if not text:
             return
@@ -78,7 +82,7 @@ class TtsService:
         if not self._eleven_disabled and self._chars_today + len(text) <= self._daily_cap:
             tier_yielded_any = False
             try:
-                async for chunk in self._eleven_stream(text):
+                async for chunk in self._eleven_stream(text, voice_id=voice_id):
                     tier_yielded_any = True
                     yield chunk
                 if tier_yielded_any:
@@ -118,15 +122,20 @@ class TtsService:
             logger.exception("Edge TTS failed")
             raise TtsError("all TTS providers failed")
 
+    def chars_remaining_today(self) -> int:
+        return max(0, self._daily_cap - self._chars_today)
+
     # ---- ElevenLabs ----
-    async def _eleven_stream(self, text: str) -> AsyncIterator[bytes]:
+    async def _eleven_stream(self, text: str, voice_id: str | None = None) -> AsyncIterator[bytes]:
         if self._eleven_client is None:
             from elevenlabs.client import ElevenLabs
             self._eleven_client = ElevenLabs(api_key=self._eleven_api_key)
 
+        chosen_voice = voice_id or self._eleven_voice_id
+
         def _generate():
             return self._eleven_client.text_to_speech.convert(
-                voice_id=self._eleven_voice_id,
+                voice_id=chosen_voice,
                 model_id=self._eleven_model,
                 text=text,
                 output_format="mp3_44100_128",

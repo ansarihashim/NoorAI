@@ -19,7 +19,8 @@ class Settings(BaseSettings):
 
     # TTS — primary
     elevenlabs_api_key: str = ""
-    elevenlabs_voice_id: str = "21m00Tcm4TlvDq8ikWAM"
+    elevenlabs_voice_id: str = "21m00Tcm4TlvDq8ikWAM"  # narrator / host (Rachel)
+    elevenlabs_guest_voice_id: str = "pNInz6obpgDQGcFmaJgB"  # podcast co-host (Adam)
     elevenlabs_model: str = "eleven_turbo_v2_5"
 
     # TTS — fallback
@@ -40,6 +41,11 @@ class Settings(BaseSettings):
     session_max_minutes: int = 30
     elevenlabs_chars_per_day: int = 50000
     storage_dir: str = "./storage"
+
+    # Auth
+    jwt_secret: str = ""
+    jwt_algorithm: str = "HS256"
+    access_token_ttl_minutes: int = 60 * 24 * 7  # 7 days
 
     @property
     def cors_origin_list(self) -> list[str]:

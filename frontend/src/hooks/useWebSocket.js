@@ -1,9 +1,17 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { getToken } from '../lib/api.js'
 
 const URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws/audio'
 const HEARTBEAT_MS = 25_000
 const MAX_BACKOFF_MS = 8_000
 const INITIAL_BACKOFF_MS = 500
+
+function buildUrl() {
+  const token = getToken()
+  if (!token) return URL
+  const sep = URL.includes('?') ? '&' : '?'
+  return `${URL}${sep}token=${encodeURIComponent(token)}`
+}
 
 /**
  * Persistent WebSocket with exponential-backoff reconnect, heartbeat, and
@@ -30,7 +38,8 @@ export function useWebSocket({ onJson, onBytes } = {}) {
     let reconnectTimer = null
 
     const connect = () => {
-      const ws = new WebSocket(URL)
+      const url = buildUrl()
+      const ws = new WebSocket(url)
       ws.binaryType = 'arraybuffer'
       wsRef.current = ws
       currentWs = ws
