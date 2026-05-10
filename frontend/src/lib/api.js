@@ -165,4 +165,113 @@ export function podcastTurnUrl(docId, idx) {
   return `${BASE}/api/podcast/${docId}/turn/${idx}.mp3?token=${token}`
 }
 
+// ---------- preparation (multi-doc; all POST so doc_ids fits in body) ----------
+export async function getOverview(docIds) {
+  return request('/api/preparation/overview', { method: 'POST', body: { doc_ids: docIds } })
+}
+export async function generateOverview(docIds, { n_min, n_max, force = false } = {}) {
+  const body = { doc_ids: docIds, force }
+  if (n_min != null) body.n_min = n_min
+  if (n_max != null) body.n_max = n_max
+  return request('/api/preparation/overview/generate', { method: 'POST', body })
+}
+export async function deleteOverview(docIds) {
+  return request('/api/preparation/overview/delete', { method: 'POST', body: { doc_ids: docIds } })
+}
+
+export async function getImportantQuestions(docIds) {
+  return request('/api/preparation/questions', { method: 'POST', body: { doc_ids: docIds } })
+}
+export async function generateImportantQuestions(docIds, { n, force = false } = {}) {
+  const body = { doc_ids: docIds, force }
+  if (n != null) body.n = n
+  return request('/api/preparation/questions/generate', { method: 'POST', body })
+}
+export async function deleteImportantQuestions(docIds) {
+  return request('/api/preparation/questions/delete', { method: 'POST', body: { doc_ids: docIds } })
+}
+
+export async function getExplanation(docIds, topic) {
+  return request('/api/preparation/explanation', { method: 'POST', body: { doc_ids: docIds, topic } })
+}
+export async function generateExplanation(docIds, topic, { force = false } = {}) {
+  return request('/api/preparation/explanation/generate', {
+    method: 'POST',
+    body: { doc_ids: docIds, topic, force },
+  })
+}
+
+// ---------- revision (per-doc) ----------
+export async function getFlashcards(docId) {
+  return request(`/api/revision/${docId}/flashcards`)
+}
+export async function generateFlashcards(docId, { n, force = false } = {}) {
+  const body = { force }
+  if (n != null) body.n = n
+  return request(`/api/revision/${docId}/flashcards/generate`, { method: 'POST', body })
+}
+export async function deleteFlashcards(docId) {
+  return request(`/api/revision/${docId}/flashcards`, { method: 'DELETE' })
+}
+
+export async function getQuiz(docId) {
+  return request(`/api/revision/${docId}/quiz`)
+}
+export async function generateQuiz(docId, { n, force = false } = {}) {
+  const body = { force }
+  if (n != null) body.n = n
+  return request(`/api/revision/${docId}/quiz/generate`, { method: 'POST', body })
+}
+export async function deleteQuiz(docId) {
+  return request(`/api/revision/${docId}/quiz`, { method: 'DELETE' })
+}
+
+export async function getRecall(docId) {
+  return request(`/api/revision/${docId}/recall`)
+}
+export async function generateRecall(docId, { n, force = false } = {}) {
+  const body = { force }
+  if (n != null) body.n = n
+  return request(`/api/revision/${docId}/recall/generate`, { method: 'POST', body })
+}
+export async function deleteRecall(docId) {
+  return request(`/api/revision/${docId}/recall`, { method: 'DELETE' })
+}
+
+export async function getQuickRevision(docId) {
+  return request(`/api/revision/${docId}/quick-revision`)
+}
+export async function generateQuickRevision(docId, { max_topics, force = false } = {}) {
+  const body = { force }
+  if (max_topics != null) body.max_topics = max_topics
+  return request(`/api/revision/${docId}/quick-revision/generate`, { method: 'POST', body })
+}
+export async function deleteQuickRevision(docId) {
+  return request(`/api/revision/${docId}/quick-revision`, { method: 'DELETE' })
+}
+
+export async function getNightBefore(docId) {
+  return request(`/api/revision/${docId}/night-before`)
+}
+export async function generateNightBefore(docId, { n, force = false } = {}) {
+  const body = { force }
+  if (n != null) body.n = n
+  return request(`/api/revision/${docId}/night-before/generate`, { method: 'POST', body })
+}
+export async function deleteNightBefore(docId) {
+  return request(`/api/revision/${docId}/night-before`, { method: 'DELETE' })
+}
+
+export async function getViva(docId) {
+  return request(`/api/revision/${docId}/viva`)
+}
+export async function generateViva(docId, { n, force = false } = {}) {
+  const body = { force }
+  if (n != null) body.n = n
+  return request(`/api/revision/${docId}/viva/generate`, { method: 'POST', body })
+}
+export async function deleteViva(docId) {
+  return request(`/api/revision/${docId}/viva`, { method: 'DELETE' })
+}
+
 export const apiBase = BASE

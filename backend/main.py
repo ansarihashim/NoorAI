@@ -5,7 +5,20 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.config.settings import get_settings
-from backend.routes import audio, auth, documents, llm, narration, podcast, tts, upload, visuals, voices
+from backend.routes import (
+    audio,
+    auth,
+    documents,
+    llm,
+    narration,
+    podcast,
+    preparation,
+    revision,
+    tts,
+    upload,
+    visuals,
+    voices,
+)
 
 
 def _configure_logging() -> None:
@@ -62,6 +75,8 @@ def create_app() -> FastAPI:
     app.include_router(narration.router, prefix="/api/narration", tags=["narration"])
     app.include_router(podcast.router, prefix="/api/podcast", tags=["podcast"])
     app.include_router(visuals.router, prefix="/api/visuals", tags=["visuals"])
+    app.include_router(preparation.router, prefix="/api/preparation", tags=["preparation"])
+    app.include_router(revision.router, prefix="/api/revision", tags=["revision"])
     app.include_router(voices.router, prefix="/api/voices", tags=["voices"])
     app.include_router(audio.router, tags=["audio"])
 

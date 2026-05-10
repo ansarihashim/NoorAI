@@ -2,6 +2,45 @@
 @tailwind components;
 @tailwind utilities;
 
+/* NoorAI — premium AI-powered study sanctuary.
+   Warm-dark, layered surface hierarchy, reading-first. No neon. */
+
+:root {
+  --bg-page:     #000000;
+  --bg-raised:   #0A0A0A;
+  --bg-elevated: #111111;
+  --bg-float:    #1A1A1A;
+  --bg-ai:       #0A0A0A;
+  --rule:        rgba(255,255,255,0.10);
+  --rule-strong: rgba(255,255,255,0.20);
+
+  --ink:         #FFFFFF;
+  --ink-muted:   #BFBFBF;
+  --ink-dim:     #8C8C8C;
+  --ink-faint:   #555555;
+
+  --accent:      #FFD60A;
+  --accent-soft: #FFDD00;
+  --accent-bright:#FFE100;
+  --accent-deep: #FFC300;
+  --sage:        #FFD60A;
+  --dusk:        #FFD60A;
+
+  --font-sans:   "Inter Tight", Inter, system-ui, sans-serif;
+  --font-serif:  "Source Serif 4", "Newsreader", Charter, Georgia, serif;
+  --font-mono:   "JetBrains Mono", ui-monospace, monospace;
+
+  /* Workspace shell metrics — single source of truth, used by
+     WorkspaceShell + the mode views that anchor inside it. */
+  --shell-nav-h:        56px;
+  --shell-sources-w:    272px;
+  --shell-sources-w-min:200px;
+  --shell-sources-w-max:380px;
+  --shell-studio-w:     320px;
+  --shell-studio-w-min: 240px;
+  --shell-studio-w-max: 420px;
+}
+
 @layer base {
   html, body, #root {
     height: 100%;
@@ -10,34 +49,48 @@
     color-scheme: dark;
   }
   body {
-    background: radial-gradient(ellipse at top, #1a1f3f 0%, #0a0d1a 60%);
+    background: var(--bg-page);
+    color: var(--ink);
+    font-family: var(--font-sans);
     min-height: 100vh;
     font-feature-settings: 'cv11', 'ss01', 'ss03';
     -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    /* The shell holds its own scroll inside panels; avoid double scrollbars. */
+    overflow: hidden;
   }
-  /* faint film grain for perceived depth — pure CSS, no asset cost */
-  body::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    z-index: 0;
-    opacity: 0.04;
-    mix-blend-mode: overlay;
-    background-image: url("data:image/svg+xml;utf8,<svg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.45'/></svg>");
-  }
+  /* Old neon ambient layers — explicitly disabled. */
+  body::before, body::after { display: none; }
   #root {
     position: relative;
     z-index: 1;
+    height: 100vh;
   }
   ::selection {
-    background: rgba(139, 92, 246, 0.35);
-    color: #fff;
+    background: #FFD60A;
+    color: #000000;
   }
   *:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 2px #0a0d1a, 0 0 0 4px rgba(139, 92, 246, 0.55);
+    box-shadow: 0 0 0 2px var(--bg-page), 0 0 0 3px #FFD60A;
     border-radius: 6px;
+  }
+  *::-webkit-scrollbar { width: 10px; height: 10px; }
+  *::-webkit-scrollbar-track { background: transparent; }
+  *::-webkit-scrollbar-thumb {
+    background: rgba(245, 236, 217, 0.06);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: rgba(245, 236, 217, 0.14);
+    background-clip: padding-box;
+    border: 2px solid transparent;
+  }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(245, 236, 217, 0.10) transparent;
   }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
@@ -49,37 +102,183 @@
 }
 
 @layer components {
-  .glass {
-    @apply bg-surface-raised/70 backdrop-blur-xl border border-white/[0.06] rounded-card shadow-hairline;
-  }
-  .glass-strong {
-    @apply bg-surface-raised/85 backdrop-blur-2xl border border-white/[0.08] rounded-card;
-  }
-  .hairline {
-    @apply border border-white/[0.06];
-  }
-  /* legacy classes kept while older components are still in tree */
-  .btn {
-    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-250 ease-expo disabled:opacity-50 disabled:cursor-not-allowed;
-  }
-  .btn-primary {
-    @apply btn bg-accent-purple hover:bg-accent-purple-soft text-white;
-  }
-  .btn-ghost {
-    @apply btn bg-white/5 hover:bg-white/10 text-slate-100;
-  }
-  .text-balance { text-wrap: balance; }
-  .text-pretty { text-wrap: pretty; }
+  /* Calm warm-dark surfaces. No glass, no blur, no glow. */
+  .surface-panel    { @apply bg-raised   border border-rule rounded-md; }
+  .surface-raised   { @apply bg-elevated border border-rule rounded-md; }
+  .surface-floating { @apply bg-float    border border-rule rounded-lg shadow-floatSoft; }
+  /* legacy aliases */
+  .glass        { @apply bg-raised border border-rule rounded-md; }
+  .glass-strong { @apply bg-elevated border border-rule rounded-md; }
 
-  /* Shimmer used in skeletons */
+  .hairline       { @apply border border-rule; }
+  .divider-soft   { background: var(--rule); height: 1px; width: 100%; }
+  .divider-strong { background: var(--rule-strong); height: 1px; width: 100%; }
+
+  /* Buttons — calm primary (amber block) and quiet ghost (text + hairline). */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md font-medium
+           transition-colors duration-180 ease-expo
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-primary { @apply btn bg-accent text-page hover:bg-accent-deep; }
+  .btn-ghost   { @apply btn bg-transparent border border-rule text-ink hover:bg-elevated; }
+
+  .text-balance { text-wrap: balance; }
+  .text-pretty  { text-wrap: pretty; }
+
+  .eyebrow {
+    @apply text-[0.6875rem] uppercase tracking-[0.10em] text-ink-muted font-medium;
+  }
+  .caption {
+    @apply text-[0.8125rem] text-ink-muted font-medium;
+  }
+
   .shimmer {
     background: linear-gradient(
       90deg,
-      rgba(255,255,255,0.04) 0%,
-      rgba(255,255,255,0.10) 50%,
-      rgba(255,255,255,0.04) 100%
+      rgba(240, 233, 221, 0.04) 0%,
+      rgba(240, 233, 221, 0.10) 50%,
+      rgba(240, 233, 221, 0.04) 100%
     );
     background-size: 200% 100%;
     @apply animate-shimmer;
   }
+
+  /* Mode-atmosphere classes are retired but defined as no-ops so legacy
+     usages compile. The mode is now expressed by the active rail item +
+     contextual AI Studio panel, not by a colored aura. */
+  .mode-atmosphere,
+  .mode-atmosphere--narration,
+  .mode-atmosphere--podcast,
+  .mode-atmosphere--visualize,
+  .mode-atmosphere--revision,
+  .mode-atmosphere--preparation {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: none;
+  }
+
+  .text-gradient {
+    background: linear-gradient(135deg, var(--accent) 0%, var(--sage) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* Long-form serif column for the reading pane / podcast transcript. */
+  .prose-serif {
+    font-family: var(--font-serif);
+    font-size: 1.0625rem;
+    line-height: 1.7;
+    color: var(--ink);
+  }
+  .prose-serif p + p { margin-top: 1em; }
+
+  /* Live indicator — amber dot that breathes 1Hz (Ask Doubt mic on,
+     AI thinking, etc.). */
+  .live-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 9999px;
+    background: var(--accent);
+    @apply animate-breathe;
+  }
+
+  /* Workspace shell — the persistent 3-panel layout. Center column
+     scrolls independently; rails do not. */
+  .shell-grid {
+    display: grid;
+    grid-template-columns:
+      var(--shell-sources-w-current, var(--shell-sources-w))
+      minmax(0, 1fr)
+      var(--shell-studio-w-current, var(--shell-studio-w));
+    height: calc(100vh - var(--shell-nav-h));
+    min-height: 0;
+  }
+  .shell-rail {
+    @apply bg-raised border-rule;
+    overflow-y: auto;
+    overflow-x: hidden;
+    min-height: 0;
+  }
+  .shell-center {
+    @apply bg-page;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-width: 0;
+    min-height: 0;
+  }
+  /* Rail collapsed state — width crunched to a sliver with a single toggle. */
+  .shell-rail-collapsed { width: 0; padding: 0; border-width: 0; }
+}
+
+/* === Marketing scope =====================================================
+   The workspace shell pins body+#root to viewport height. Marketing pages
+   need page scroll instead. We toggle .echo-marketing on <html> from the
+   marketing AppShell variant to override. No other rules touch this scope.
+   ========================================================================= */
+html.echo-marketing,
+html.echo-marketing body,
+html.echo-marketing #root {
+  height: auto;
+  min-height: 100%;
+  overflow: visible;
+}
+html.echo-marketing body {
+  background: #000000;
+  color: #FFFFFF;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+html.echo-marketing #root {
+  height: auto;
+  min-height: 100vh;
+}
+
+/* All historical gradient/glow helpers retired — kept as no-ops so any
+   legacy class still in JSX doesn't punch a hole in the design. */
+.echo-grid    { background-image: none; }
+.echo-noise   { background-image: none; }
+.echo-radial  { background: none; }
+
+/* Solid card — neutral hairline border, no gradient, no backdrop-blur. */
+.echo-card {
+  background: #0A0A0A;
+  border: 1px solid rgba(255,255,255,0.10);
+}
+.echo-card-strong {
+  background: #111111;
+  border: 1px solid rgba(255,255,255,0.10);
+}
+
+.echo-divider {
+  background: rgba(255,255,255,0.10);
+  height: 1px;
+  width: 100%;
+}
+/* Plain solid vivid yellow — no gradient. */
+.echo-text-gradient,
+.echo-text-warm   { color: #FFD60A; background: none; -webkit-background-clip: initial; background-clip: initial; }
+
+.echo-ring-glow   { box-shadow: none; }
+.echo-top-edge    { position: relative; }
+.echo-hover-bright { transition: border-color 150ms ease, background-color 150ms ease, color 150ms ease; }
+.echo-hover-bright:hover { border-color: rgba(255,255,255,0.20); }
+
+@layer utilities {
+  .mask-fade-y {
+    mask-image: linear-gradient(to bottom, transparent, #000 8%, #000 92%, transparent);
+    -webkit-mask-image: linear-gradient(to bottom, transparent, #000 8%, #000 92%, transparent);
+  }
+  .mask-fade-y-bottom {
+    mask-image: linear-gradient(to bottom, #000 70%, transparent);
+    -webkit-mask-image: linear-gradient(to bottom, #000 70%, transparent);
+  }
+  .stack-row { display: grid; grid-template-columns: 1fr; gap: 0; }
+  .font-content { font-family: var(--font-serif); }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { scrollbar-width: none; }
 }

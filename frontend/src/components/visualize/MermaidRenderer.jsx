@@ -22,7 +22,7 @@ function loadMermaid() {
         securityLevel: 'strict',
         fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif',
         themeVariables: {
-          // Match EchoVerse's palette so diagrams feel native
+          // Match NoorAI's palette so diagrams feel native
           background: '#0a0d1a',
           primaryColor: '#1c2148',
           primaryBorderColor: '#8b5cf6',

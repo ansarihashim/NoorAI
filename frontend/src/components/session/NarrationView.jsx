@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useSearchParams } from 'react-router-dom'
 import { useAudio } from '../../hooks/useAudio.js'
 import { useMicStream } from '../../hooks/useMicStream.js'
 import { useAudioPlayer } from '../../hooks/useAudioPlayer.js'
@@ -13,44 +14,44 @@ import {
 } from '../../lib/api.js'
 import PremiumPlayer from '../player/PremiumPlayer.jsx'
 import ReadingPane from './ReadingPane.jsx'
-import TranscriptDrawer from './TranscriptDrawer.jsx'
 import { useToast } from '../ui/Toast.jsx'
 
 /**
- * Narration mode, rebuilt on the new HTTP-audio architecture.
+ * Narration mode — calm reading + on-demand voice Q&A.
  *
- *  - Audio plays through a real HTML5 <audio> element (chunk = chapter).
- *  - The user has full Spotify-style control: pause/seek/skip/speed/volume.
- *  - The WebSocket is used only for the interrupt-and-answer loop:
- *      mic frames in, transcript out, Q&A audio bytes out via the legacy
- *      MediaSource player (kept for ephemeral Q&A audio only).
- *  - Click any paragraph in the reading pane to jump to that chunk.
- *  - Auto-resume after an interruption is dismissed; explicit Resume button
- *    when the user is in INTERRUPTED state and Whisper is still pending.
+ * Audio interaction model: NO automatic VAD interruption. The mic is OFF
+ * by default; the user explicitly clicks "Ask a doubt" to pause narration
+ * and open the mic. This removes accidental noise-triggered interruptions
+ * (the brief pain point) while keeping the existing backend pipeline.
+ *
+ * The legacy WebSocket pipeline is still in use for the actual Q&A:
+ *   click → pause audio → mic.start() → sendJson({type:'start_attend'})
+ *   user speaks → backend's EOU detection ends the turn naturally
+ *   AI replies (audio bytes via WS → MediaSource player)
+ *   on `state: idle/attending` we resume narration
  */
 export default function NarrationView({
   docId,
-  serverState,            // 'idle' | 'attending' | 'interrupted' | 'thinking' | 'speaking'
+  serverState,
   wsStatus,
   sendJson,
   sendBytes,
-  messages,               // Q&A transcript log
-  interruption,           // { reason, message } | null — last dismissal reason
+  messages,
+  interruption,
   clearInterruption,
   initialChapter,
   initialLocalTime,
-  onPositionChange,       // (idx, time) — Continue Listening persistence
+  onPositionChange,
 }) {
   const toast = useToast()
   const { host: hostVoiceId } = useVoicePrefs()
   const voiceId = hostVoiceId || undefined
-  const [manifest, setManifest] = useState(null)   // { doc_id, title, n_chunks, chunks: [{idx, text, audio_ready}] }
+  const [manifest, setManifest] = useState(null)
   const [warn, setWarn] = useState('')
-  const [transcriptOpen, setTranscriptOpen] = useState(true)
-  const [attended, setAttended] = useState(false)  // have we sent start_attend yet?
+  const [askArmed, setAskArmed] = useState(false)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const action = searchParams.get('action')
 
-  // Q&A audio uses the legacy streaming MediaSource player (ephemeral, no
-  // need to cache or seek). Narration uses the new HTML5 player.
   const qaPlayer = useAudioPlayer()
 
   // -------- manifest fetch --------
@@ -67,13 +68,12 @@ export default function NarrationView({
     return () => { cancelled = true }
   }, [docId, voiceId, toast])
 
-  // -------- chapters for the new audio hook --------
   const chapters = useMemo(() => {
     if (!manifest) return []
     return manifest.chunks.map((c) => ({
       idx: c.idx,
       url: narrationChunkUrl(docId, c.idx, voiceId),
-      label: `Chunk ${c.idx + 1}`,
+      label: `¶ ${c.idx + 1}`,
       durationHint: estimateChunkDuration(c.text),
     }))
   }, [manifest, docId, voiceId])
@@ -112,104 +112,89 @@ export default function NarrationView({
     prefetchNarration(docId, ahead, voiceId).catch(() => {})
   }, [audio.state.idx, manifest, docId, voiceId])
 
-  // -------- mic + start_attend --------
+  // -------- mic stream (off by default; only opened by Ask Doubt) --------
   const onMicFrame = useCallback((buf) => sendBytes(buf), [sendBytes])
   const mic = useMicStream({ onFrame: onMicFrame })
 
-  const ensureAttending = useCallback(async () => {
-    if (attended || wsStatus !== 'open') return
-    try {
-      sendJson({ type: 'start_attend', doc_id: docId })
-      setAttended(true)
-    } catch { /* no-op */ }
-  }, [attended, wsStatus, sendJson, docId])
-
-  const handlePlay = useCallback(async () => {
-    setWarn('')
-    // Attach mic best-effort so interruption works.
-    if (!mic.active) {
-      try {
-        await mic.start()
-      } catch (err) {
-        const name = err?.name || 'Error'
-        if (name === 'NotAllowedError') setWarn('Microphone permission denied — narration plays without voice interruption.')
-        else if (name === 'NotFoundError') setWarn('No microphone — narration plays without voice interruption.')
-        else setWarn(`Mic unavailable (${name}) — narration plays without interruption.`)
-      }
-    }
-    await ensureAttending()
-    audio.play()
-  }, [mic, ensureAttending, audio])
-
-  // -------- interruption coordination --------
-  // When the server tells us narration was interrupted, pause the HTML5 audio.
-  // Q&A audio bytes flow into the legacy useAudioPlayer (passed up to Session
-  // via onBytes there). When the server returns to ATTENDING, resume narration.
-  const wasPlayingBeforeInterruptionRef = useRef(false)
-  useEffect(() => {
-    if (serverState === 'interrupted' || serverState === 'thinking' || serverState === 'speaking') {
-      if (audio.state.playing) {
-        wasPlayingBeforeInterruptionRef.current = true
-        audio.pause()
-      }
-    } else if (serverState === 'attending' || serverState === 'idle') {
-      if (wasPlayingBeforeInterruptionRef.current) {
-        wasPlayingBeforeInterruptionRef.current = false
-        audio.play()
-      }
-    }
-  }, [serverState, audio])
-
-  // Q&A audio bytes from WS go into the streaming MediaSource player.
-  // We expose a setter back to Session via callback prop (qaPlayerRef).
-  // Easier: PUSH bytes via window event isn't great. Let Session pass us a
-  // stable ref instead. We expose qaPlayer.push via a ref the parent reads.
+  // -------- Q&A audio sink (legacy MediaSource player) --------
   useEffect(() => {
     window.__echoverse_qa_player = qaPlayer
     return () => { delete window.__echoverse_qa_player }
   }, [qaPlayer])
 
-  // Flush Q&A audio queue when server says so.
   useEffect(() => {
     function onFlush() { qaPlayer.flush() }
     window.addEventListener('echoverse:flush_audio', onFlush)
     return () => window.removeEventListener('echoverse:flush_audio', onFlush)
   }, [qaPlayer])
 
-  // -------- explicit Resume Narration handler --------
+  // -------- Ask Doubt flow (manual, replaces auto-VAD) --------
+  const askDoubt = useCallback(async () => {
+    setWarn('')
+    if (audio.state.playing) audio.pause()
+    if (!mic.active) {
+      try {
+        await mic.start()
+      } catch (err) {
+        const name = err?.name || 'Error'
+        if (name === 'NotAllowedError') setWarn('Microphone permission denied — can\'t hear you.')
+        else if (name === 'NotFoundError') setWarn('No microphone found.')
+        else setWarn(`Mic unavailable (${name}).`)
+        return
+      }
+    }
+    if (wsStatus === 'open') {
+      try { sendJson({ type: 'start_attend', doc_id: docId }) } catch { /* no-op */ }
+    }
+    setAskArmed(true)
+  }, [audio, mic, wsStatus, sendJson, docId])
+
+  const cancelAsk = useCallback(() => {
+    try { sendJson({ type: 'stop' }) } catch { /* no-op */ }
+    if (mic.active) mic.stop?.()
+    setAskArmed(false)
+    audio.play()
+  }, [sendJson, mic, audio])
+
+  // AI Studio "Ask a doubt" action triggers the same flow.
+  useEffect(() => {
+    if (action === 'ask-doubt' && !askArmed) {
+      askDoubt()
+      const next = new URLSearchParams(searchParams)
+      next.delete('action'); next.delete('action_at')
+      setSearchParams(next, { replace: true })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [action, searchParams.get('action_at')])
+
+  // When server returns to idle/attending after a Q&A, auto-resume narration.
+  useEffect(() => {
+    if (!askArmed) return
+    if (serverState === 'idle' || serverState === 'attending') {
+      // The model finished speaking — turn off the ask state and resume.
+      setAskArmed(false)
+      if (mic.active) mic.stop?.()
+      audio.play()
+    }
+  }, [serverState, askArmed, audio, mic])
+
+  // -------- explicit Resume Narration (banner) --------
   const handleResume = useCallback(() => {
     clearInterruption?.()
     audio.play()
   }, [audio, clearInterruption])
 
-  // -------- click-paragraph-to-jump --------
   const onChunkClick = useCallback((idx) => {
     audio.seekChapter(idx, 0)
     audio.play()
   }, [audio])
 
-  // Wrap the audio controller so any caller (keyboard shortcuts, OS lockscreen,
-  // PremiumPlayer button) goes through handlePlay — that's where we attach the
-  // mic and send start_attend to the server.
-  const wrappedAudio = useMemo(
-    () => ({
-      ...audio,
-      play: handlePlay,
-      toggle: () => {
-        if (audio.state.paused || audio.state.ended) handlePlay()
-        else audio.pause()
-      },
-    }),
-    [audio, handlePlay],
-  )
-
-  // -------- OS lockscreen + keyboard --------
   useMediaSession({
     enabled: chapters.length > 0,
-    title: manifest?.title || 'Narration',
-    artist: 'EchoVerse',
-    album: 'EchoVerse Narration',
-    onPlay: handlePlay,
+    title: manifest?.title || 'Reading',
+    artist: 'NoorAI',
+    album: 'Narration',
+    onPlay: audio.play,
     onPause: audio.pause,
     onSeek: audio.seekGlobal,
     onPrev: audio.prevChapter,
@@ -219,20 +204,20 @@ export default function NarrationView({
     state: audio.state,
   })
 
-  useKeyboardControls({ enabled: chapters.length > 0, audio: wrappedAudio })
+  useKeyboardControls({ enabled: chapters.length > 0, audio })
 
-  // -------- render --------
   const noChapters = chapters.length === 0
+  const lastQA = messages.length > 0 ? messages[messages.length - 1] : null
 
   return (
     <div className="flex h-full flex-col">
       <AnimatePresence>
         {warn && (
           <motion.div
-            initial={{ opacity: 0, y: -6 }}
+            initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
-            className="mx-auto mt-3 max-w-3xl rounded-xl border border-accent-amber/30 bg-accent-amber/[0.08] px-4 py-2 text-xs text-accent-amber"
+            className="mx-auto mt-2 max-w-3xl rounded-sm border border-rule bg-elevated px-3 py-1.5 text-[0.78rem] text-ink-muted"
           >
             {warn}
           </motion.div>
@@ -242,67 +227,96 @@ export default function NarrationView({
       <AnimatePresence>
         {interruption && (
           <motion.div
-            initial={{ opacity: 0, y: -6 }}
+            initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -6 }}
-            className="mx-auto mt-3 flex max-w-3xl items-center justify-between gap-3 rounded-xl border border-accent-cyan/30 bg-accent-cyan/[0.06] px-4 py-2 text-xs text-accent-cyan-soft"
+            exit={{ opacity: 0 }}
+            className="mx-auto mt-2 flex max-w-3xl items-center justify-between gap-3 rounded-sm border border-rule bg-elevated px-3 py-1.5 text-[0.78rem] text-ink-muted"
           >
-            <span className="flex-1 text-left text-ink-muted">
-              {interruption.message || 'Narration paused.'}
-            </span>
+            <span>{interruption.message || 'Reading paused.'}</span>
             <button
               onClick={handleResume}
-              className="rounded-pill border border-accent-cyan/40 bg-accent-cyan/[0.10] px-3 py-1 text-[0.7rem] font-medium uppercase tracking-[0.08em] text-accent-cyan-soft hover:bg-accent-cyan/[0.18]"
+              className="text-[0.78rem] text-accent transition-colors hover:text-accent-deep"
             >
-              Resume narration
+              Resume →
             </button>
           </motion.div>
         )}
       </AnimatePresence>
 
-      <div className="mx-auto flex w-full max-w-6xl flex-1 gap-4 overflow-hidden p-4 sm:p-6">
-        <div className="glass relative min-w-0 flex-1 overflow-hidden">
+      {/* Reading column — single max-w, no glass card. */}
+      <div className="mx-auto flex w-full max-w-[760px] flex-1 flex-col overflow-hidden px-6 pt-6">
+        <div className="min-h-0 flex-1 overflow-y-auto">
           <ReadingPane
             chunks={(manifest?.chunks || []).map((c) => c.text)}
             currentIdx={audio.state.idx}
             totalChunks={manifest?.n_chunks || 0}
-            state={mapAudioToFsmState(serverState, audio.state)}
+            state={mapAudioToFsmState(serverState, audio.state, askArmed)}
             hasStarted={audio.state.idx >= 0}
             onChunkClick={onChunkClick}
           />
         </div>
-        <TranscriptDrawer
-          messages={messages}
-          open={transcriptOpen}
-          onToggle={() => setTranscriptOpen((v) => !v)}
-        />
       </div>
 
-      {/* Player bar */}
-      <div className="mx-auto w-full max-w-6xl px-4 pb-5 sm:px-6">
-        <PremiumPlayer
-          audio={wrappedAudio}
-          chapters={chapters}
-          title={manifest?.title || 'Narration'}
-          nowPlayingLabel={
-            audio.state.idx >= 0
-              ? `Chunk ${audio.state.idx + 1} of ${chapters.length}${mic.active ? ' · listening for interruptions' : ''}`
-              : `${chapters.length} chunks · press play to begin`
-          }
-          disabled={noChapters}
-          onChapterClick={onChunkClick}
-        />
-        {noChapters && (
-          <p className="mt-2 text-center text-xs text-ink-faint">
-            Preparing audio…
-          </p>
-        )}
+      {/* Sticky bottom bar — player + Ask Doubt + last Q&A peek */}
+      <div className="border-t border-rule bg-raised">
+        <div className="mx-auto w-full max-w-[760px] px-6 py-3">
+          {askArmed ? (
+            <div className="flex items-center justify-between gap-3 rounded-md border border-accent bg-accent-soft px-3 py-2.5">
+              <div className="flex items-center gap-2.5">
+                <span className="live-dot" />
+                <span className="text-[0.875rem] text-ink">Listening — speak your question</span>
+              </div>
+              <button
+                onClick={cancelAsk}
+                className="text-[0.8125rem] text-ink-dim transition-colors hover:text-ink"
+              >
+                Cancel · resume
+              </button>
+            </div>
+          ) : (
+            <PremiumPlayer
+              audio={audio}
+              chapters={chapters}
+              title={manifest?.title || 'Reading'}
+              nowPlayingLabel={
+                audio.state.idx >= 0
+                  ? `Paragraph ${audio.state.idx + 1} of ${chapters.length}`
+                  : `${chapters.length} paragraphs · press play to begin`
+              }
+              disabled={noChapters}
+              onChapterClick={onChunkClick}
+            />
+          )}
+
+          {/* Ask Doubt + last Q&A peek (when not armed) */}
+          {!askArmed && (
+            <div className="mt-2 flex items-center justify-between gap-3">
+              <button
+                onClick={askDoubt}
+                disabled={wsStatus !== 'open'}
+                className="inline-flex items-center gap-2 rounded-md border border-rule bg-elevated px-3 py-1.5 text-[0.8125rem] text-ink-muted transition-colors hover:bg-float hover:text-ink disabled:opacity-50"
+              >
+                <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3zM5 11v1a7 7 0 0014 0v-1M12 19v3" />
+                </svg>
+                Ask a doubt
+              </button>
+              {lastQA && (
+                <div className="min-w-0 flex-1 truncate text-right text-[0.78rem] text-ink-dim">
+                  <span className="text-ink-faint">{lastQA.role === 'user' ? 'You: ' : 'Claude: '}</span>
+                  <span className="text-ink-muted">{lastQA.text}</span>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
 }
 
-function mapAudioToFsmState(serverState, audioState) {
+function mapAudioToFsmState(serverState, audioState, askArmed) {
+  if (askArmed && (serverState === 'attending' || serverState === 'idle')) return 'interrupted'
   if (serverState === 'thinking') return 'thinking'
   if (serverState === 'interrupted') return 'interrupted'
   if (serverState === 'speaking') return 'speaking'

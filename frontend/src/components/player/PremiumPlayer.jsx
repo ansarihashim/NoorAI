@@ -1,5 +1,4 @@
 import { useMemo } from 'react'
-import { motion } from 'framer-motion'
 import SeekBar from './SeekBar.jsx'
 import SpeedControl from './SpeedControl.jsx'
 import VolumeControl from './VolumeControl.jsx'
@@ -14,9 +13,8 @@ function IconButton({ onClick, ariaLabel, disabled, children, size = 'md', tone 
     lg: 'h-12 w-12',
   }
   const tones = {
-    default: 'text-ink-muted hover:text-ink hover:bg-white/[0.06]',
-    primary:
-      'text-white bg-gradient-to-b from-accent-purple to-[#7c4ce9] hover:brightness-110 shadow-glow',
+    default: 'text-ink-muted hover:text-ink hover:bg-elevated border border-rule',
+    primary: 'text-page bg-accent hover:bg-accent-deep border border-transparent',
   }
   return (
     <button
@@ -25,7 +23,7 @@ function IconButton({ onClick, ariaLabel, disabled, children, size = 'md', tone 
       disabled={disabled}
       aria-label={ariaLabel}
       className={[
-        'group relative inline-flex items-center justify-center rounded-full border border-white/[0.06] transition-all duration-150 ease-expo',
+        'group relative inline-flex items-center justify-center rounded-full transition-colors duration-180 ease-expo',
         'disabled:opacity-40 disabled:cursor-not-allowed',
         'active:scale-95',
         sizes[size],
@@ -37,6 +35,10 @@ function IconButton({ onClick, ariaLabel, disabled, children, size = 'md', tone 
   )
 }
 
+/**
+ * Calm warm-dark player. Reused by both Narration and Podcast modes.
+ * No glow, no gradients — single amber primary, hairline secondaries.
+ */
 export default function PremiumPlayer({
   audio,
   chapters,
@@ -66,12 +68,7 @@ export default function PremiumPlayer({
   const noChapters = chapters.length === 0
 
   return (
-    <motion.div
-      initial={{ y: 12, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-      transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-      className={['glass-strong relative p-4 sm:p-5', className].join(' ')}
-    >
+    <div className={['rounded-md border border-rule bg-raised p-4', className].join(' ')}>
       {/* Top row: now-playing label + speed/volume */}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
@@ -79,7 +76,7 @@ export default function PremiumPlayer({
             <div className="truncate text-[0.8125rem] font-medium text-ink">{title}</div>
           )}
           {nowPlayingLabel && (
-            <div className="mt-0.5 truncate text-[0.7rem] text-ink-muted">{nowPlayingLabel}</div>
+            <div className="mt-0.5 truncate text-[0.7rem] text-ink-dim">{nowPlayingLabel}</div>
           )}
         </div>
         <div className="flex items-center gap-2">
@@ -116,11 +113,10 @@ export default function PremiumPlayer({
         )}
         {showSkip && (
           <IconButton onClick={() => audio.skip(-SKIP_SEC)} ariaLabel={`Back ${SKIP_SEC} seconds`} disabled={disabled}>
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
               <path d="M3 12a9 9 0 109-9" />
               <path d="M3 5v5h5" />
             </svg>
-            <span className="absolute font-mono text-[0.55rem] font-semibold text-ink-muted group-hover:text-ink" style={{ marginTop: 14 }}>{SKIP_SEC}</span>
           </IconButton>
         )}
 
@@ -140,11 +136,10 @@ export default function PremiumPlayer({
 
         {showSkip && (
           <IconButton onClick={() => audio.skip(SKIP_SEC)} ariaLabel={`Forward ${SKIP_SEC} seconds`} disabled={disabled}>
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 12a9 9 0 11-9-9" />
               <path d="M21 5v5h-5" />
             </svg>
-            <span className="absolute font-mono text-[0.55rem] font-semibold text-ink-muted group-hover:text-ink" style={{ marginTop: 14 }}>{SKIP_SEC}</span>
           </IconButton>
         )}
         {showPrevNext && (
@@ -158,29 +153,32 @@ export default function PremiumPlayer({
         )}
       </div>
 
-      {/* Optional chapter chip strip — handy when chapters have meaningful labels (e.g. host/guest turns) */}
+      {/* Chapter chip strip — when chapters have labels (e.g. host/guest turns) */}
       {chapters.some((c) => c.label) && (
-        <div className="mt-4 flex gap-1 overflow-x-auto pb-1">
+        <div className="mt-4 flex gap-1.5 overflow-x-auto pb-1">
           {annotated.map((c) => {
             const active = c.idx === state.idx
             const past = c.idx < state.idx
+            const isGuest = c.speaker === 'guest'
             return (
               <button
                 key={c.idx}
                 onClick={() => onChapterClick?.(c.idx) ?? audio.seekChapter(c.idx, 0)}
                 title={c.label || `Chapter ${c.idx + 1}`}
                 className={[
-                  'inline-flex shrink-0 items-center gap-1.5 rounded-pill border px-2.5 py-1 font-mono text-[0.65rem] tabular-nums transition-colors',
+                  'inline-flex shrink-0 items-center gap-1.5 rounded-sm border px-2 py-1 font-mono text-[0.65rem] tabular-nums transition-colors',
                   active
-                    ? c.speaker === 'guest'
-                      ? 'border-accent-cyan/40 bg-accent-cyan/[0.10] text-accent-cyan-soft'
-                      : 'border-accent-purple/40 bg-accent-purple/[0.10] text-accent-purple-soft'
+                    ? 'border-accent bg-accent-soft text-ink'
                     : past
-                      ? 'border-white/[0.04] text-ink-faint hover:border-white/[0.08] hover:text-ink-muted'
-                      : 'border-white/[0.06] text-ink-muted hover:border-white/[0.12] hover:text-ink',
+                      ? 'border-rule text-ink-faint hover:border-rule-strong hover:text-ink-dim'
+                      : 'border-rule text-ink-dim hover:border-rule-strong hover:text-ink-muted',
                 ].join(' ')}
               >
-                <span className="font-semibold uppercase tracking-wider">
+                <span className={[
+                  'inline-block h-1.5 w-1.5 rounded-full',
+                  isGuest ? 'bg-sage' : 'bg-dusk',
+                ].join(' ')} />
+                <span className="uppercase tracking-wider">
                   {c.label || `Ch ${c.idx + 1}`}
                 </span>
                 {c.duration > 0 && <span className="opacity-70">{formatTime(c.duration)}</span>}
@@ -189,6 +187,6 @@ export default function PremiumPlayer({
           })}
         </div>
       )}
-    </motion.div>
+    </div>
   )
 }

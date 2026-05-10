@@ -28,8 +28,8 @@ export function useMediaSession({
     try {
       navigator.mediaSession.metadata = new window.MediaMetadata({
         title: title || '',
-        artist: artist || 'EchoVerse',
-        album: album || 'EchoVerse',
+        artist: artist || 'NoorAI',
+        album: album || 'NoorAI',
         artwork: artwork || [],
       })
     } catch {

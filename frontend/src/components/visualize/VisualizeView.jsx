@@ -312,7 +312,7 @@ function EmptyState({ examples, onPick }) {
           No diagrams yet for this document.
         </h3>
         <p className="mx-auto mt-2 max-w-sm text-pretty text-sm text-ink-muted">
-          Type what you'd like to see — a flowchart, mind map, roadmap, sequence — and EchoVerse will draw it from your notes.
+          Type what you'd like to see — a flowchart, mind map, roadmap, sequence — and NoorAI will draw it from your notes.
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           {examples.map((ex) => (

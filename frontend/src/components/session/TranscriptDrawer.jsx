@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 
 const ROLE = {
   user: { label: 'You', tint: 'border-accent-purple/30 bg-accent-purple/[0.06]', dot: 'bg-accent-purple' },
-  assistant: { label: 'EchoVerse', tint: 'border-accent-cyan/30 bg-accent-cyan/[0.06]', dot: 'bg-accent-cyan' },
+  assistant: { label: 'NoorAI', tint: 'border-accent-cyan/30 bg-accent-cyan/[0.06]', dot: 'bg-accent-cyan' },
   narrator: { label: 'Narrator', tint: 'border-white/[0.06] bg-white/[0.02]', dot: 'bg-ink-muted' },
 }
 

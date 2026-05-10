@@ -5,20 +5,20 @@ import { LogoMark } from '../ui/Logo.jsx'
 
 const STEPS = [
   {
-    title: 'Welcome to EchoVerse',
-    body: 'Drop in any document — notes, a chapter, a transcript — and EchoVerse turns it into something you can listen to. Two modes, one upload.',
+    title: 'Welcome to NoorAI',
+    body: 'Drop in any document — notes, a chapter, a transcript — and NoorAI turns it into something you can listen to. Two modes, one upload.',
     art: 'logo',
     cta: "Show me",
   },
   {
     title: 'Speak to interrupt',
-    body: 'In Narration mode, just start talking. EchoVerse pauses, answers from your notes, then picks up exactly where it stopped. You can deny mic access — narration still plays, you just can\'t interrupt by voice.',
+    body: 'In Narration mode, just start talking. NoorAI pauses, answers from your notes, then picks up exactly where it stopped. You can deny mic access — narration still plays, you just can\'t interrupt by voice.',
     art: 'mic',
     cta: 'Got it',
   },
   {
     title: 'Generate a podcast',
-    body: 'Want it explained instead of read? Switch to Podcast mode and EchoVerse writes a host + co-host episode about your document. Great for revision or a passive listen.',
+    body: 'Want it explained instead of read? Switch to Podcast mode and NoorAI writes a host + co-host episode about your document. Great for revision or a passive listen.',
     art: 'podcast',
     cta: "Let's start",
   },

@@ -28,16 +28,16 @@ export default function ReadingPane({ chunks, currentIdx, totalChunks, state, ha
     return (
       <div className="grid h-full place-items-center px-6 py-16 text-center">
         <div className="max-w-md">
-          <div className="mx-auto inline-flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-accent-purple/25 to-accent-cyan/15 text-accent-purple-soft ring-1 ring-white/[0.08]">
-            <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <div className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-md border border-rule bg-elevated text-ink-dim">
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
               <path d="M3 5h18M3 12h18M3 19h13" />
             </svg>
           </div>
-          <h2 className="mt-5 font-display text-xl font-semibold text-ink">
+          <h2 className="mt-5 font-serif text-title text-ink">
             Ready when you are.
           </h2>
-          <p className="mx-auto mt-2 text-pretty text-sm text-ink-muted">
-            Press <span className="rounded-md border border-white/[0.08] bg-white/[0.04] px-1.5 py-0.5 font-mono text-[0.7rem]">Start</span> below to begin narration. Speak any time to interrupt and ask a question — narration resumes automatically.
+          <p className="mx-auto mt-2 max-w-sm font-serif text-[0.95rem] leading-relaxed text-ink-muted">
+            Press <span className="rounded-sm border border-rule bg-elevated px-1.5 py-0.5 font-mono text-[0.7rem]">Play</span> below to begin reading. Click <span className="text-accent">Ask a doubt</span> any time to pause and ask a question — reading resumes automatically.
           </p>
         </div>
       </div>
@@ -84,19 +84,19 @@ export default function ReadingPane({ chunks, currentIdx, totalChunks, state, ha
                 } : undefined}
                 title={interactive ? `Jump to chunk ${idx + 1}` : undefined}
                 className={[
-                  'group relative rounded-xl px-4 py-3 transition-all duration-500 ease-expo',
-                  interactive ? 'cursor-pointer hover:bg-white/[0.025]' : '',
+                  'group relative rounded-md px-4 py-3 transition-colors duration-300',
+                  interactive ? 'cursor-pointer' : '',
                   active
-                    ? 'bg-accent-purple/[0.08] text-ink shadow-[inset_0_0_0_1px_rgba(139,92,246,0.18)]'
+                    ? 'text-ink'
                     : past
-                      ? 'text-ink-muted/70 hover:text-ink-muted'
+                      ? 'text-ink-dim hover:text-ink-muted'
                       : 'text-ink-muted hover:text-ink',
                 ].join(' ')}
               >
                 {active && (
                   <motion.span
                     layoutId="reading-cursor"
-                    className="absolute -left-3 top-3 bottom-3 w-1 rounded-full bg-gradient-to-b from-accent-purple to-accent-cyan"
+                    className="absolute -left-3 top-3 bottom-3 w-[2px] rounded-full bg-accent"
                     transition={{ type: 'spring', stiffness: 360, damping: 30 }}
                   />
                 )}
@@ -105,7 +105,7 @@ export default function ReadingPane({ chunks, currentIdx, totalChunks, state, ha
                     play from here
                   </span>
                 )}
-                <p className="text-pretty text-[1.0625rem] leading-[1.7]">{text}</p>
+                <p className="font-serif text-[1.0625rem] leading-[1.7] text-pretty">{text}</p>
               </motion.li>
             )
           })}
@@ -123,9 +123,9 @@ export default function ReadingPane({ chunks, currentIdx, totalChunks, state, ha
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
-              className="mt-10 rounded-xl border border-white/[0.06] bg-white/[0.02] p-5 text-center"
+              className="mt-10 rounded-md border border-rule bg-elevated p-5 text-center"
             >
-              <p className="text-sm text-ink-muted">You've reached the end.</p>
+              <p className="font-serif text-[0.95rem] text-ink-muted">You've reached the end.</p>
             </motion.div>
           )}
         </AnimatePresence>

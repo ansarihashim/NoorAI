@@ -100,7 +100,7 @@ export default function Settings() {
         transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
       >
         <span className="font-caption text-ink-muted">settings</span>
-        <h1 className="mt-2 font-display text-title text-ink">Make EchoVerse yours.</h1>
+        <h1 className="mt-2 font-display text-title text-ink">Make NoorAI yours.</h1>
         <p className="mt-2 text-sm text-ink-muted">Preferences are saved on this device.</p>
       </motion.div>
 
@@ -160,7 +160,7 @@ export default function Settings() {
 
         <Section title="About" description="What you're running.">
           <Row last>
-            <div className="text-xs text-ink-muted">EchoVerse</div>
+            <div className="text-xs text-ink-muted">NoorAI</div>
             <div className="font-mono text-xs text-ink-faint">v0.1 · Phase 1+2+3</div>
           </Row>
         </Section>

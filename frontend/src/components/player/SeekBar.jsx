@@ -88,21 +88,21 @@ export default function SeekBar({
         onPointerUp={onPointerUp}
         onPointerLeave={() => setHover(null)}
         className={[
-          'relative h-3 cursor-pointer rounded-full bg-white/[0.06] transition-colors',
-          disabled ? 'cursor-not-allowed opacity-50' : 'hover:bg-white/[0.10]',
+          'relative h-2 cursor-pointer rounded-full bg-elevated transition-colors',
+          disabled ? 'cursor-not-allowed opacity-50' : 'hover:bg-float',
         ].join(' ')}
       >
         {/* current chapter span (faint underline behind progress fill) */}
         {currentSpan && (
           <span
-            className="pointer-events-none absolute top-0 bottom-0 rounded-full bg-white/[0.05]"
+            className="pointer-events-none absolute top-0 bottom-0 rounded-full bg-rule"
             style={{ left: `${currentSpan.left}%`, width: `${currentSpan.width}%` }}
             aria-hidden
           />
         )}
         {/* progress fill */}
         <span
-          className="pointer-events-none absolute left-0 top-0 bottom-0 rounded-full bg-gradient-to-r from-accent-purple to-accent-cyan"
+          className="pointer-events-none absolute left-0 top-0 bottom-0 rounded-full bg-accent"
           style={{ width: `${pct}%` }}
           aria-hidden
         />
@@ -113,11 +113,7 @@ export default function SeekBar({
               key={t.idx}
               className={[
                 'pointer-events-none absolute top-0 bottom-0 w-px',
-                t.isHost
-                  ? 'bg-accent-purple/40'
-                  : t.isGuest
-                    ? 'bg-accent-cyan/40'
-                    : 'bg-white/[0.18]',
+                t.isHost ? 'bg-dusk/50' : t.isGuest ? 'bg-sage/50' : 'bg-rule-strong',
               ].join(' ')}
               style={{ left: `${t.pct}%` }}
               aria-hidden
@@ -126,14 +122,14 @@ export default function SeekBar({
         )}
         {/* playhead thumb */}
         <span
-          className="pointer-events-none absolute top-1/2 h-4 w-4 -translate-y-1/2 -translate-x-1/2 rounded-full bg-white shadow-[0_2px_8px_rgba(0,0,0,0.5)] ring-1 ring-white/30"
+          className="pointer-events-none absolute top-1/2 h-3 w-3 -translate-y-1/2 -translate-x-1/2 rounded-full bg-accent shadow-soft"
           style={{ left: `${pct}%` }}
           aria-hidden
         />
         {/* hover time tooltip */}
         {hover && globalDuration > 0 && (
           <span
-            className="pointer-events-none absolute -top-7 -translate-x-1/2 rounded-md bg-bg-card/90 px-1.5 py-0.5 font-mono text-[0.65rem] text-ink shadow-lift"
+            className="pointer-events-none absolute -top-7 -translate-x-1/2 rounded-sm border border-rule bg-float px-1.5 py-0.5 font-mono text-[0.65rem] text-ink"
             style={{ left: `${hover.x}px` }}
             aria-hidden
           >
@@ -142,7 +138,7 @@ export default function SeekBar({
         )}
       </div>
 
-      <div className="mt-1.5 flex items-center justify-between font-mono text-[0.7rem] text-ink-muted">
+      <div className="mt-1.5 flex items-center justify-between font-mono text-[0.7rem] text-ink-dim">
         <span>{formatTime(globalTime)}</span>
         <span>{formatTime(globalDuration)}</span>
       </div>

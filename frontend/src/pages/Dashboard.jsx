@@ -97,7 +97,7 @@ export default function Dashboard() {
           {greeting}{firstName ? `, ${firstName}` : ''}.
         </h1>
         <p className="mt-2 max-w-xl text-pretty text-ink-muted">
-          Drop a document below — EchoVerse will narrate it back, answer your questions, and (soon) generate a
+          Drop a document below — NoorAI will narrate it back, answer your questions, and (soon) generate a
           podcast-style discussion from it.
         </p>
       </motion.div>

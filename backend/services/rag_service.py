@@ -105,6 +105,15 @@ class RagService:
     def get_meta(self, doc_id: str) -> dict:
         return json.loads((self._root / doc_id / "meta.json").read_text(encoding="utf-8"))
 
+    def n_rag_chunks(self, doc_id: str) -> int:
+        meta_path = self._root / doc_id / "meta.json"
+        if meta_path.exists():
+            n = json.loads(meta_path.read_text(encoding="utf-8")).get("n_rag")
+            if isinstance(n, int):
+                return n
+        _, chunks = self._load(doc_id)
+        return len(chunks)
+
     def exists(self, doc_id: str) -> bool:
         return (self._root / doc_id / "index.faiss").exists()
 

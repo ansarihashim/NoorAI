@@ -57,11 +57,16 @@ export default function UploadCard({ onUploaded }) {
   const charCount = text.length
 
   return (
-    <div className="glass relative overflow-hidden p-6 sm:p-8">
-      <div className="flex items-center justify-between gap-4">
+    <div
+      className="group relative overflow-hidden rounded-xl border border-rule bg-elevated p-6 transition-colors duration-200 hover:border-rule-strong sm:p-8"
+    >
+      <div className="relative flex items-center justify-between gap-4">
         <div>
-          <span className="font-caption text-ink-muted">new document</span>
-          <h2 className="mt-1.5 font-display text-2xl font-semibold tracking-tight text-ink">
+          <span className="inline-flex items-center gap-2 text-[0.78rem] font-semibold text-accent">
+            <span className="h-1.5 w-1.5 rounded-full bg-accent" />
+            New document
+          </span>
+          <h2 className="mt-2 font-serif text-[1.65rem] font-semibold leading-tight tracking-tight text-ink">
             What are we studying today?
           </h2>
         </div>
@@ -103,7 +108,7 @@ export default function UploadCard({ onUploaded }) {
                 onChange={(e) => setText(e.target.value)}
                 rows={10}
                 placeholder="Drop in a few paragraphs of your notes — anything from a chapter summary to a lecture transcript…"
-                className="w-full resize-y rounded-xl border border-white/[0.08] bg-white/[0.03] px-3.5 py-3 font-mono text-[0.85rem] leading-relaxed text-ink placeholder:text-ink-faint outline-none transition-colors focus:border-accent-purple/50 focus:shadow-[0_0_0_4px_rgba(139,92,246,0.12)]"
+                className="w-full resize-y rounded-lg border border-rule bg-page px-4 py-3 font-mono text-[0.85rem] leading-relaxed text-ink placeholder:text-ink-faint outline-none transition-colors duration-150 hover:border-rule-strong focus:border-accent focus:shadow-[0_0_0_3px_rgba(255,214,10,0.25)]"
               />
               <div className="pointer-events-none absolute bottom-2.5 right-3.5 font-mono text-[0.7rem] text-ink-faint">
                 {charCount.toLocaleString()} chars
@@ -136,13 +141,13 @@ export default function UploadCard({ onUploaded }) {
               onDragLeave={() => setDragging(false)}
               onDrop={onDrop}
               className={[
-                'group relative flex w-full flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed py-10 px-6 text-center transition-all',
+                'group relative flex w-full flex-col items-center justify-center gap-3 rounded-lg border border-dashed py-10 px-6 text-center transition-colors duration-150',
                 dragging
-                  ? 'border-accent-purple/60 bg-accent-purple/[0.07] shadow-[0_0_0_6px_rgba(139,92,246,0.08)]'
-                  : 'border-white/[0.10] bg-white/[0.02] hover:border-white/[0.18] hover:bg-white/[0.04]',
+                  ? 'border-accent bg-page'
+                  : 'border-rule-strong bg-page hover:border-accent',
               ].join(' ')}
             >
-              <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-accent-purple/20 to-accent-cyan/20 text-accent-purple-soft ring-1 ring-white/[0.06]">
+              <span className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-rule-strong bg-page text-accent transition-colors duration-150 group-hover:border-accent group-hover:text-accent-soft">
                 <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5-5 5 5M12 5v12" />
                 </svg>

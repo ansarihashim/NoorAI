@@ -122,8 +122,8 @@ export default function PodcastView({
     title: title || 'Podcast',
     artist: turns?.[audio.state.idx]?.speaker
       ? `${SPEAKERS[turns[audio.state.idx].speaker]?.name || ''}`
-      : 'EchoVerse',
-    album: 'EchoVerse Podcast',
+      : 'NoorAI',
+    album: 'NoorAI Podcast',
     onPlay: audio.play,
     onPause: audio.pause,
     onSeek: audio.seekGlobal,
@@ -157,7 +157,7 @@ export default function PodcastView({
           <p className="mx-auto mt-3 max-w-sm text-pretty text-sm text-ink-muted">
             {status === 'generating'
               ? 'A host and a co-host are riffing on your notes. This usually takes 5–15 seconds.'
-              : 'EchoVerse will write a host + co-host conversation grounded in your document — perfect for a passive listen.'}
+              : 'NoorAI will write a host + co-host conversation grounded in your document — perfect for a passive listen.'}
           </p>
           {status === 'generating' ? (
             <div className="mx-auto mt-6 max-w-xs space-y-2">
