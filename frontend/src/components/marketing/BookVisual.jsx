@@ -1,167 +1,206 @@
-import Waveform from './Waveform.jsx'
+import { motion, useReducedMotion } from 'framer-motion'
 
 /**
- * Hero centerpiece — a clean, static open-book illustration.
- * Pure black surface, solid yellow accents. No animation, no glow,
- * no foggy lighting. Sized to sit in the right column of the hero.
+ * Premium AI-study notebook — the hero centerpiece.
+ * Replaces the old static open-book illustration with an "intelligent
+ * notebook" composition: a primary spread with handwritten-feeling structure,
+ * an annotation card sliding in from the right (the AI margin), and a
+ * citation chip clipped to the page. Black floor, vivid yellow accents,
+ * thin elegant lines. No fog, no gradient overlays.
  */
 export default function BookVisual() {
+  const reduce = useReducedMotion()
+  const ease = [0.22, 1, 0.36, 1]
+
   return (
     <div className="relative mx-auto w-full max-w-[640px]">
-      <div className="relative aspect-[5/4]">
-        <BookSvg />
-      </div>
+      {/* faint paper rule on the entire frame */}
+      <span aria-hidden className="rag-paper-rule" />
 
-      {/* Static caption card — sits below the book, no float, no animation */}
-      <div className="mx-auto mt-6 w-full max-w-[420px] rounded-xl border border-echo-border bg-echo-surface p-4">
-        <div className="flex items-center gap-3">
-          <span className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-echo-border bg-echo-bg text-echo-accent">
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-              <path d="M3 11v2M7 8v8M11 4v16M15 8v8M19 11v2" />
-            </svg>
-          </span>
-          <div className="min-w-0 flex-1">
-            <div className="text-[0.7rem] font-medium uppercase tracking-[0.14em] text-echo-muted">
-              Narrating
+      <div className="relative aspect-[5/4]">
+        {/* primary spread — solid surface, hairline rule, subtle inner shadow */}
+        <motion.div
+          initial={reduce ? false : { opacity: 0, y: 18 }}
+          animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0 }}
+          transition={{ duration: 0.85, ease }}
+          className="absolute inset-x-2 inset-y-3 overflow-hidden rounded-xl border border-echo-border bg-echo-surface"
+        >
+          {/* notebook ruled lines, masked at edges */}
+          <span aria-hidden className="rag-paper-rule" />
+
+          {/* red margin line — academic touch */}
+          <span
+            aria-hidden
+            className="pointer-events-none absolute left-[16%] top-6 bottom-6 w-px"
+            style={{ background: 'linear-gradient(to bottom, transparent, rgba(255,214,10,0.30), transparent)' }}
+          />
+
+          {/* === handwritten-style heading ================================== */}
+          <div className="relative px-8 pt-6">
+            <div className="font-mono text-[0.62rem] uppercase tracking-[0.18em] text-echo-muted">
+              chapter · 04
             </div>
-            <div className="truncate text-[0.9rem] font-medium text-echo-text">
-              Cellular Respiration · pg 4
+            <h3 className="mt-1 font-serif text-[1.4rem] font-semibold leading-tight tracking-tight text-echo-text">
+              Cellular Respiration
+            </h3>
+            {/* yellow underline that "draws in" */}
+            <motion.span
+              aria-hidden
+              initial={reduce ? false : { scaleX: 0 }}
+              animate={reduce ? { scaleX: 1 } : { scaleX: 1 }}
+              transition={{ duration: 0.7, delay: 0.35, ease }}
+              style={{ transformOrigin: 'left' }}
+              className="mt-2 block h-[3px] w-32 rounded-full bg-echo-accent"
+            />
+          </div>
+
+          {/* === outlined notes (left) + AI annotations (right) ============= */}
+          <div className="relative mt-5 grid gap-6 px-8 pb-7 sm:grid-cols-[1.1fr_0.9fr]">
+            {/* notes column */}
+            <div className="space-y-2.5">
+              {[
+                { w: '92%', dim: false, hi: false },
+                { w: '78%', dim: false, hi: true  },
+                { w: '85%', dim: false, hi: false },
+                { w: '64%', dim: true,  hi: false },
+                { w: '88%', dim: false, hi: false },
+                { w: '54%', dim: true,  hi: false },
+              ].map((line, i) => (
+                <motion.div
+                  key={i}
+                  initial={reduce ? false : { width: 0, opacity: 0 }}
+                  animate={reduce ? { width: line.w, opacity: 1 } : { width: line.w, opacity: 1 }}
+                  transition={{ duration: 0.65, delay: 0.55 + i * 0.07, ease }}
+                  className={[
+                    'relative h-[7px] rounded-full',
+                    line.hi ? 'bg-echo-accent' : line.dim ? 'bg-white/[0.10]' : 'bg-white/[0.22]',
+                  ].join(' ')}
+                />
+              ))}
+
+              {/* equation badge */}
+              <motion.div
+                initial={reduce ? false : { opacity: 0, y: 8 }}
+                animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 1.0, ease }}
+                className="mt-4 inline-flex items-center gap-2 rounded-md border border-echo-border bg-echo-bg px-2.5 py-1.5 font-mono text-[0.78rem] tabular-nums text-echo-text"
+              >
+                <span className="text-echo-muted">eq.</span>
+                <span>C₆H₁₂O₆ + 6O₂ → 6CO₂ + 6H₂O</span>
+              </motion.div>
+            </div>
+
+            {/* AI annotation column — "the margin" */}
+            <div className="relative">
+              {/* connector line from notes → annotation */}
+              <motion.svg
+                aria-hidden
+                viewBox="0 0 100 100"
+                preserveAspectRatio="none"
+                className="absolute -left-6 top-2 h-24 w-12"
+              >
+                <motion.path
+                  d="M0,16 C30,16 30,46 80,46"
+                  fill="none"
+                  stroke="rgba(255,214,10,0.55)"
+                  strokeWidth="1.2"
+                  strokeDasharray="3 3"
+                  initial={reduce ? { pathLength: 1 } : { pathLength: 0 }}
+                  animate={{ pathLength: 1 }}
+                  transition={{ duration: 0.9, delay: 0.9, ease }}
+                />
+              </motion.svg>
+
+              <motion.div
+                initial={reduce ? false : { opacity: 0, x: 16 }}
+                animate={reduce ? { opacity: 1 } : { opacity: 1, x: 0 }}
+                transition={{ duration: 0.7, delay: 1.05, ease }}
+                className="rounded-lg border border-echo-accent/40 bg-echo-accent/[0.06] p-3.5"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex h-5 w-5 items-center justify-center rounded-sm bg-echo-accent text-echo-bg">
+                    <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 3l1.6 4.2L18 9l-4.4 1.8L12 15l-1.6-4.2L6 9l4.4-1.8z" />
+                    </svg>
+                  </span>
+                  <span className="font-mono text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-echo-accent">
+                    AI annotation
+                  </span>
+                </div>
+                <p className="mt-2 font-serif text-[0.84rem] leading-snug text-echo-text">
+                  ATP yield jumps from 2 (glycolysis) to ~32 once oxygen is present — the entire purpose of the Krebs cycle.
+                </p>
+                {/* citation chips */}
+                <div className="mt-2.5 flex flex-wrap gap-1.5">
+                  {['¶c1', '¶c2', '¶c4'].map((c) => (
+                    <span
+                      key={c}
+                      className="rounded-pill border border-echo-accent/40 bg-echo-bg px-1.5 py-0.5 font-mono text-[0.6rem] text-echo-accent"
+                    >
+                      {c}
+                    </span>
+                  ))}
+                </div>
+              </motion.div>
+
+              {/* small "linking concept" tag underneath */}
+              <motion.div
+                initial={reduce ? false : { opacity: 0, y: 6 }}
+                animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 1.25, ease }}
+                className="mt-3 inline-flex items-center gap-1.5 text-[0.72rem] text-echo-muted"
+              >
+                <span className="h-1 w-1 rounded-full bg-echo-accent" />
+                Linked to <span className="font-medium text-echo-text">Mitochondrial Membrane</span>
+              </motion.div>
             </div>
           </div>
-          <span className="font-mono text-[0.74rem] text-echo-muted">02:41</span>
-        </div>
-        <div className="mt-3">
-          <Waveform bars={42} height={28} width={2} gap={3} />
-        </div>
+
+          {/* footer — page number + auto-tags */}
+          <div className="absolute inset-x-7 bottom-3 flex items-center justify-between text-[0.66rem] text-echo-muted/80">
+            <span className="font-mono">— pg 12 —</span>
+            <span className="flex items-center gap-1.5">
+              {['biology', 'metabolism', 'ATP'].map((t) => (
+                <span key={t} className="rounded-pill border border-echo-border bg-echo-bg px-1.5 py-0.5 font-mono text-[0.6rem]">
+                  {t}
+                </span>
+              ))}
+            </span>
+          </div>
+        </motion.div>
+
+        {/* Floating concept tag (top-right) — drifts in from the corner */}
+        <motion.div
+          initial={reduce ? false : { opacity: 0, y: -10, x: 8 }}
+          animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0, x: 0 }}
+          transition={{ duration: 0.7, delay: 1.35, ease }}
+          className="absolute -right-2 top-2 inline-flex items-center gap-2 rounded-pill border border-echo-accent/50 bg-echo-bg px-3 py-1.5 shadow-floatSoft"
+        >
+          <span className="h-1.5 w-1.5 rounded-full bg-echo-accent" />
+          <span className="text-[0.74rem] font-semibold text-echo-text">
+            Concept:&nbsp;
+            <span className="text-echo-accent">Krebs Cycle</span>
+          </span>
+        </motion.div>
+
+        {/* Retrieval snippet (bottom-left) — looks like a chunk slipping into the notebook */}
+        <motion.div
+          initial={reduce ? false : { opacity: 0, y: 14, rotate: -1 }}
+          animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0, rotate: -2 }}
+          transition={{ duration: 0.85, delay: 1.55, ease }}
+          className="absolute -left-1 bottom-0 w-[58%] origin-bottom-left rounded-md border border-echo-border bg-echo-bg p-3 shadow-floatSoft"
+        >
+          <div className="flex items-center gap-2 font-mono text-[0.6rem] uppercase tracking-[0.16em] text-echo-muted">
+            <span className="inline-flex h-4 items-center rounded-sm bg-echo-accent px-1 text-echo-bg">PDF</span>
+            <span>retrieved chunk · score 0.92</span>
+          </div>
+          <div className="mt-2 space-y-1.5">
+            <div className="h-1.5 w-[90%] rounded-full bg-white/[0.18]" />
+            <div className="h-1.5 w-[78%] rounded-full bg-echo-accent/85" />
+            <div className="h-1.5 w-[64%] rounded-full bg-white/[0.10]" />
+          </div>
+        </motion.div>
       </div>
     </div>
-  )
-}
-
-/* ------------------------------------------------------------- */
-/* Static SVG — no animation, no gradient overlays. Solid colors. */
-/* ------------------------------------------------------------- */
-function BookSvg() {
-  return (
-    <svg
-      viewBox="0 0 460 360"
-      className="block h-full w-full"
-      aria-hidden
-    >
-      {/* Book covers (left + right slightly tilted) */}
-      <path d="M 30 70 L 226 88 L 226 280 L 30 264 Z" fill="#0A0A0A" stroke="rgba(255,255,255,0.10)" strokeWidth="1" />
-      <path d="M 234 88 L 430 70 L 430 264 L 234 280 Z" fill="#0A0A0A" stroke="rgba(255,255,255,0.10)" strokeWidth="1" />
-
-      {/* Pages — left + right (off-white) */}
-      <path d="M 40 80 L 226 94 L 226 268 L 40 256 Z" fill="#F4ECDC" />
-      <path d="M 234 94 L 420 80 L 420 256 L 234 268 Z" fill="#F4ECDC" />
-
-      {/* Spine */}
-      <rect x="226" y="88" width="8" height="192" fill="#000000" />
-
-      {/* === Left page content =================================== */}
-      <text x="55" y="110" fontFamily="'Source Serif 4', Georgia, serif" fontSize="14" fontWeight="700" fill="#0A0A0A">
-        Cellular Respiration
-      </text>
-      {[130, 144, 158, 172, 186, 200, 214, 228, 242].map((y, i) => (
-        <rect
-          key={`l-${i}`}
-          x="55"
-          y={y}
-          width={i % 3 === 2 ? 110 : 152}
-          height="2.4"
-          fill="rgba(10,10,10,0.55)"
-          rx="1"
-        />
-      ))}
-      {/* yellow highlight stripe */}
-      <rect x="55" y="152" width="152" height="9" rx="2" fill="#FFD60A" opacity="0.85" />
-      {/* yellow underline */}
-      <rect x="55" y="193" width="110" height="2" rx="1" fill="#FFD60A" />
-
-      {/* === Right page content =================================== */}
-      <text x="252" y="110" fontFamily="'Source Serif 4', Georgia, serif" fontSize="11" fontWeight="700" fill="#0A0A0A">
-        Stages of ATP Synthesis
-      </text>
-      {[
-        { y: 132, label: 'Glycolysis' },
-        { y: 154, label: 'Krebs Cycle' },
-        { y: 176, label: 'Electron Transport' },
-        { y: 198, label: 'ATP Synthase' },
-      ].map((s, i) => (
-        <g key={s.label}>
-          <circle cx="262" cy={s.y} r="2.6" fill={i === 1 ? '#FFD60A' : 'rgba(10,10,10,0.55)'} />
-          <text
-            x="272"
-            y={s.y + 3.5}
-            fontFamily="'Source Serif 4', Georgia, serif"
-            fontSize="9.5"
-            fontWeight={i === 1 ? '700' : '400'}
-            fill="#0A0A0A"
-          >
-            {s.label}
-          </text>
-          {i < 3 && (
-            <line x1="262" y1={s.y + 3} x2="262" y2={s.y + 19} stroke="rgba(10,10,10,0.35)" strokeWidth="0.6" strokeDasharray="2,2" />
-          )}
-        </g>
-      ))}
-
-      {/* mini diagram */}
-      <g transform="translate(330 120)">
-        <rect width="68" height="100" rx="4" fill="#FFF6E0" stroke="rgba(245,185,66,0.45)" strokeWidth="1" />
-        <text x="6" y="14" fontSize="7.5" fontWeight="700" fill="#0A0A0A" fontFamily="'Source Serif 4', Georgia, serif">
-          FIG · 4.1
-        </text>
-        {[20, 50, 35, 70, 28, 60].map((h, i) => (
-          <rect
-            key={i}
-            x={6 + i * 10}
-            y={90 - h}
-            width="6"
-            height={h}
-            fill="#FFD60A"
-            opacity={0.5 + (i % 3) * 0.15}
-          />
-        ))}
-      </g>
-
-      {/* page numbers */}
-      <text x="100" y="260" fontSize="8" fill="rgba(10,10,10,0.55)" fontFamily="'Source Serif 4', Georgia, serif">— 12 —</text>
-      <text x="346" y="260" fontSize="8" fill="rgba(10,10,10,0.55)" fontFamily="'Source Serif 4', Georgia, serif">— 13 —</text>
-
-      {/* Sticky note (top-left) */}
-      <g transform="translate(0 24) rotate(-4 100 60)">
-        <rect x="14" y="28" width="160" height="74" rx="4" fill="#FFE100" />
-        <rect x="14" y="28" width="160" height="14" fill="#FFD60A" />
-        <text x="22" y="38" fontSize="6.5" fontWeight="700" fill="#0A0A0A" fontFamily="'Inter Tight', sans-serif">
-          NOTE
-        </text>
-        <text x="22" y="62" fontSize="9" fontWeight="500" fill="#0A0A0A" fontFamily="'Source Serif 4', Georgia, serif">
-          ATP = the cell&apos;s
-        </text>
-        <text x="22" y="76" fontSize="9" fontWeight="500" fill="#0A0A0A" fontFamily="'Source Serif 4', Georgia, serif">
-          rechargeable battery.
-        </text>
-      </g>
-
-      {/* Concept tag (top-right) */}
-      <g transform="translate(360 18)">
-        <rect width="86" height="22" rx="11" fill="#0A0A0A" stroke="#FFD60A" strokeWidth="1" />
-        <circle cx="12" cy="11" r="2.5" fill="#FFD60A" />
-        <text x="20" y="14.5" fontSize="8" fontWeight="600" fill="#FFFFFF" fontFamily="'Inter Tight', sans-serif">
-          Krebs Cycle
-        </text>
-      </g>
-
-      {/* Pencil (right side) */}
-      <g transform="translate(360 246) rotate(24 60 15)">
-        <rect x="0" y="6" width="14" height="18" rx="2" fill="#FFDD00" />
-        <rect x="14" y="6" width="4" height="18" fill="#0A0A0A" />
-        <rect x="18" y="6" width="78" height="18" fill="#FFD60A" stroke="rgba(10,10,10,0.35)" strokeWidth="0.6" />
-        <polygon points="96,6 116,15 96,24" fill="#FFE9B0" stroke="rgba(10,10,10,0.35)" strokeWidth="0.6" />
-        <polygon points="110,12 116,15 110,18" fill="#0A0A0A" />
-      </g>
-    </svg>
   )
 }

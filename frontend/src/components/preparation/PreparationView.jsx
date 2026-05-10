@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import DocPicker from './DocPicker.jsx'
 import OverviewView from './OverviewView.jsx'
@@ -11,15 +12,47 @@ const SUB_TABS = [
   { value: 'explanation', label: 'Simplest Explanation' },
 ]
 
+// AI-Studio right-rail action ids → preparation sub-tab. Anything not listed
+// here just bumps the action signal through to the sub-view, which can act on
+// it (e.g. ExplanationView focusing the topic input).
+const ACTION_TO_TAB = {
+  overview:              'overview',
+  'important-questions': 'questions',
+  'predict-paper':       'questions',
+  'topic-relationships': 'overview',
+  'simplify-topic':      'explanation',
+  analogy:               'explanation',
+}
+
 /**
  * Top-level Preparation tab. Three sub-features all share the same multi-doc
  * selection — pick docs once, then switch between modes.
  */
 export default function PreparationView({ activeDocId }) {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [tab, setTab] = useState('overview')
   // Initialize with the active doc selected by default.
   const [docIds, setDocIds] = useState(() => (activeDocId ? [activeDocId] : []))
   const [pickerOpen, setPickerOpen] = useState(false)
+  // The latest action signal we've forwarded to the sub-view. Bumped any time
+  // the user fires a new action from the AI Studio rail.
+  const [actionSignal, setActionSignal] = useState(null)
+
+  // Listen for ?action=... pings from the AI Studio rail. We switch to the
+  // matching tab and forward an action object the sub-view can react to.
+  useEffect(() => {
+    const action = searchParams.get('action')
+    if (!action) return
+    const at = searchParams.get('action_at') || ''
+    const targetTab = ACTION_TO_TAB[action]
+    if (targetTab) setTab(targetTab)
+    setActionSignal({ action, at })
+    // Clear the URL marker so the same action can be fired again later.
+    const next = new URLSearchParams(searchParams)
+    next.delete('action')
+    next.delete('action_at')
+    setSearchParams(next, { replace: true })
+  }, [searchParams, setSearchParams])
 
   const summary =
     docIds.length === 0
@@ -118,9 +151,9 @@ export default function PreparationView({ activeDocId }) {
                 exit={{ opacity: 0, y: -4 }}
                 transition={{ duration: 0.2 }}
               >
-                {tab === 'overview' && <OverviewView docIds={docIds} />}
-                {tab === 'questions' && <ImportantQuestionsView docIds={docIds} />}
-                {tab === 'explanation' && <ExplanationView docIds={docIds} />}
+                {tab === 'overview' && <OverviewView docIds={docIds} action={actionSignal} />}
+                {tab === 'questions' && <ImportantQuestionsView docIds={docIds} action={actionSignal} />}
+                {tab === 'explanation' && <ExplanationView docIds={docIds} action={actionSignal} />}
               </motion.div>
             </AnimatePresence>
           )}

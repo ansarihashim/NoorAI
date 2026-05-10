@@ -26,12 +26,32 @@ export default function WorkspaceTopBar() {
 
   useEffect(() => {
     if (!menuOpen) return
-    function onDoc(e) {
+    function onDocPointer(e) {
       if (!e.target.closest('[data-user-menu]')) setMenuOpen(false)
     }
-    document.addEventListener('click', onDoc)
-    return () => document.removeEventListener('click', onDoc)
+    function onKey(e) {
+      if (e.key === 'Escape') setMenuOpen(false)
+    }
+    // mousedown beats click — closes the menu before any nested click resolves,
+    // which avoids the "menu is open but the underlying button stole the event"
+    // race we saw on the Sign out button.
+    document.addEventListener('mousedown', onDocPointer)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDocPointer)
+      document.removeEventListener('keydown', onKey)
+    }
   }, [menuOpen])
+
+  async function onSignOut() {
+    setMenuOpen(false)
+    try {
+      await logout()
+    } finally {
+      // Always leave the protected area, even if the server logout failed.
+      navigate('/', { replace: true })
+    }
+  }
 
   return (
     <header className="flex h-14 items-center justify-between border-b border-rule bg-raised px-3">
@@ -94,10 +114,7 @@ export default function WorkspaceTopBar() {
                   <MenuItem onClick={() => { setMenuOpen(false); navigate('/app') }}>Workspace</MenuItem>
                   <MenuItem onClick={() => { setMenuOpen(false); navigate('/app/settings') }}>Settings</MenuItem>
                   <div className="divider-soft my-1" />
-                  <MenuItem
-                    tone="accent"
-                    onClick={() => { setMenuOpen(false); logout(); navigate('/') }}
-                  >
+                  <MenuItem tone="accent" onClick={onSignOut}>
                     Sign out
                   </MenuItem>
                 </motion.div>

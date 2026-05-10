@@ -19,7 +19,7 @@ const TYPE_TONE = {
   evaluate: 'border-accent-amber/30 bg-accent-amber/[0.10] text-accent-amber',
 }
 
-export default function ImportantQuestionsView({ docIds }) {
+export default function ImportantQuestionsView({ docIds, action }) {
   const toast = useToast()
   const [set, setSet] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -65,6 +65,17 @@ export default function ImportantQuestionsView({ docIds }) {
     if (set) setConfirmRegen(true)
     else onGenerate()
   }, [set, onGenerate])
+
+  // Right-rail "Important questions" / "Predict the paper" actions.
+  useEffect(() => {
+    if (!action) return
+    if (action.action !== 'important-questions' && action.action !== 'predict-paper') return
+    if (busy) return
+    if (set === null) return
+    if (set === undefined) onGenerate()
+    else setConfirmRegen(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [action])
 
   const performRegen = useCallback(async () => {
     setBusy(true)

@@ -22,7 +22,7 @@ const KIND_TONE = {
   short: 'border-accent-amber/30 bg-accent-amber/[0.08] text-accent-amber',
 }
 
-export default function ActiveRecallView({ docId }) {
+export default function ActiveRecallView({ docId, action }) {
   const toast = useToast()
   const [set, setSet] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -67,6 +67,15 @@ export default function ActiveRecallView({ docId }) {
     if (set) setConfirmRegen(true)
     else onGenerate()
   }, [set, onGenerate])
+
+  // Right-rail "Active recall" trigger.
+  useEffect(() => {
+    if (!action || !action.generate) return
+    if (busy || set === null) return
+    if (set === undefined) onGenerate()
+    else setConfirmRegen(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [action])
 
   const performRegen = useCallback(async () => {
     setBusy(true)

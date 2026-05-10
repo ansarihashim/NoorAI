@@ -47,6 +47,28 @@
   }
   html {
     color-scheme: dark;
+    /* Premium notebook cursor — vivid-yellow nib pointing top-left, hot-spot
+       at (4,4) which is the writing tip. Native fallback: default. */
+    cursor: url('/cursor-pen.svg') 4 4, default;
+  }
+  /* Anything actionable gets the active pen variant + a `pointer` fallback
+     so accessibility tools still see "this is clickable". */
+  a, button, [role="button"], summary, label[for], select,
+  input[type="submit"], input[type="reset"], input[type="button"],
+  input[type="checkbox"], input[type="radio"], input[type="file"],
+  [data-cursor="pen-active"] {
+    cursor: url('/cursor-pen-active.svg') 4 4, pointer;
+  }
+  /* Text-input affordances keep the I-beam — writing in a field shouldn't
+     show a pen pointing somewhere else. */
+  input[type="text"], input[type="email"], input[type="password"],
+  input[type="search"], input[type="number"], input[type="url"],
+  input[type="tel"], input:not([type]), textarea, [contenteditable="true"] {
+    cursor: text;
+  }
+  /* Disabled controls show the OS not-allowed glyph, not the pen. */
+  button[disabled], a[aria-disabled="true"], [data-disabled="true"] {
+    cursor: not-allowed;
   }
   body {
     background: var(--bg-page);
@@ -267,6 +289,85 @@ html.echo-marketing #root {
 .echo-top-edge    { position: relative; }
 .echo-hover-bright { transition: border-color 150ms ease, background-color 150ms ease, color 150ms ease; }
 .echo-hover-bright:hover { border-color: rgba(255,255,255,0.20); }
+
+/* === Marketing-only — RAG visualization + Mashaal cursor + notebook bg ===== */
+@keyframes rag-token-flow {
+  0%   { left: 12px;                   opacity: 0; }
+  10%  { opacity: 1; }
+  60%  { opacity: 1; }
+  100% { left: calc(100% - 12px);      opacity: 0; }
+}
+.rag-token {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: #FFD60A;
+  box-shadow: 0 0 8px rgba(255, 214, 10, 0.7);
+  animation-name: rag-token-flow;
+  animation-iteration-count: infinite;
+  animation-timing-function: ease-in-out;
+}
+@keyframes rag-pulse-dot {
+  0%, 100% { transform: scale(0.85); opacity: 0.55; }
+  50%      { transform: scale(1);    opacity: 1; }
+}
+.rag-pulse-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: #FFD60A;
+  box-shadow: 0 0 6px rgba(255, 214, 10, 0.55);
+  animation: rag-pulse-dot 2.4s ease-in-out infinite;
+}
+.rag-paper-rule {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to bottom, rgba(255,255,255,0.035) 1px, transparent 1px);
+  background-size: 100% 32px;
+  mask-image: linear-gradient(to bottom, transparent, #000 12%, #000 88%, transparent);
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 12%, #000 88%, transparent);
+  border-radius: inherit;
+}
+
+/* Notebook backdrop — ruled paper + drafting grid, both at very low opacity. */
+.notebook-rule {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+  background-size: 100% 36px;
+  background-position: 0 64px;
+  mask-image: linear-gradient(to bottom, transparent, #000 8%, #000 92%, transparent);
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 8%, #000 92%, transparent);
+}
+.notebook-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, rgba(255, 214, 10, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 214, 10, 0.04) 1px, transparent 1px);
+  background-size: 96px 96px;
+  mask-image: radial-gradient(ellipse at top, #000 30%, transparent 75%);
+  -webkit-mask-image: radial-gradient(ellipse at top, #000 30%, transparent 75%);
+}
+.notebook-margin {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: max(2rem, calc(50% - 38rem));
+  width: 1px;
+  background: linear-gradient(to bottom, transparent, rgba(255, 214, 10, 0.18), transparent);
+  pointer-events: none;
+}
+@media (max-width: 768px) {
+  .notebook-margin { display: none; }
+}
 
 @layer utilities {
   .mask-fade-y {

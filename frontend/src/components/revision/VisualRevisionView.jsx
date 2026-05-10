@@ -109,7 +109,10 @@ const PRESETS = [
   },
 ]
 
-export default function VisualRevisionView({ docId }) {
+// `action` is accepted but currently a no-op: the visual sub-tab is
+// preset-driven, so the right-rail "Visual summary" / "Visual flowchart"
+// actions just switch to this tab and let the user pick a preset.
+export default function VisualRevisionView({ docId /* action */ }) {
   const toast = useToast()
   const [history, setHistory] = useState(null) // existing visuals for this doc
   const [active, setActive] = useState(null)

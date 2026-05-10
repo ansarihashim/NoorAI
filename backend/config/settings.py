@@ -45,7 +45,9 @@ class Settings(BaseSettings):
     # Auth
     jwt_secret: str = ""
     jwt_algorithm: str = "HS256"
-    access_token_ttl_minutes: int = 60 * 24 * 7  # 7 days
+    # 4 hours by default — short enough that an idle laptop won't stay logged in
+    # forever, long enough that a real study session isn't interrupted.
+    access_token_ttl_minutes: int = 60 * 4
 
     @property
     def cors_origin_list(self) -> list[str]:

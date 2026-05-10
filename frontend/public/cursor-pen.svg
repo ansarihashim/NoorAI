@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28" fill="none">
+  <!-- soft drop shadow so the pen reads on bright surfaces -->
+  <path d="M5.4 6 L20.5 21.1 L17.6 24 L14.4 20.8 L9 23 L9.6 17.6 Z" fill="#000" opacity="0.45" transform="translate(0.6,0.6)"/>
+  <!-- pen body: black with vivid-yellow nib -->
+  <path d="M5 5 L20 20 L17 23 L13 19 L7 22 L8 16 Z" fill="#0A0A0A" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="round"/>
+  <!-- yellow nib tip (the writing point — hot-spot lives here) -->
+  <path d="M4 4 L9 9 L7 11 L4 8 Z" fill="#FFD60A" stroke="#FFFFFF" stroke-width="0.8" stroke-linejoin="round"/>
+  <!-- hairline ink stroke trailing the nib -->
+  <path d="M4 4 L5.6 5.6" stroke="#FFFFFF" stroke-width="1" stroke-linecap="round"/>
+</svg>

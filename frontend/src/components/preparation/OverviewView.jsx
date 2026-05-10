@@ -11,7 +11,7 @@ import Dialog from '../ui/Dialog.jsx'
 import Skeleton from '../ui/Skeleton.jsx'
 import MermaidRenderer from '../visualize/MermaidRenderer.jsx'
 
-export default function OverviewView({ docIds }) {
+export default function OverviewView({ docIds, action }) {
   const toast = useToast()
   const [overview, setOverview] = useState(null) // null=loading|undefined=none|object=loaded
   const [busy, setBusy] = useState(false)
@@ -57,6 +57,17 @@ export default function OverviewView({ docIds }) {
     if (overview) setConfirmRegen(true)
     else onGenerate()
   }, [overview, onGenerate])
+
+  // React to right-rail "Generate overview" / "Topic relationships" actions.
+  useEffect(() => {
+    if (!action) return
+    if (action.action !== 'overview' && action.action !== 'topic-relationships') return
+    if (busy) return
+    if (overview === null) return // still loading; ignore so we don't double-fire
+    if (overview === undefined) onGenerate()
+    else setConfirmRegen(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [action])
 
   const performRegen = useCallback(async () => {
     setBusy(true)

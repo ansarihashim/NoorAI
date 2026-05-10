@@ -14,7 +14,7 @@ const DIFF_TONE = {
   hard: 'border-accent-rose/30 bg-accent-rose/[0.08] text-accent-rose',
 }
 
-export default function VivaView({ docId }) {
+export default function VivaView({ docId, action }) {
   const toast = useToast()
   const [set, setSet] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -59,6 +59,15 @@ export default function VivaView({ docId }) {
     if (set) setConfirmRegen(true)
     else onGenerate()
   }, [set, onGenerate])
+
+  // Right-rail "Viva prep" trigger.
+  useEffect(() => {
+    if (!action || !action.generate) return
+    if (busy || set === null) return
+    if (set === undefined) onGenerate()
+    else setConfirmRegen(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [action])
 
   const performRegen = useCallback(async () => {
     setBusy(true)

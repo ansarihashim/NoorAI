@@ -14,7 +14,7 @@ const TYPE_LABEL = {
   assertion_reason: 'Assertion · Reason',
 }
 
-export default function QuizView({ docId }) {
+export default function QuizView({ docId, action }) {
   const toast = useToast()
   const [quiz, setQuiz] = useState(null) // null=loading, undefined=none, QuizSet=loaded
   const [busy, setBusy] = useState(false)
@@ -59,6 +59,15 @@ export default function QuizView({ docId }) {
     if (quiz) setConfirmRegen(true)
     else onGenerate()
   }, [quiz, onGenerate])
+
+  // Right-rail "Start quiz" trigger.
+  useEffect(() => {
+    if (!action || !action.generate) return
+    if (busy || quiz === null) return
+    if (quiz === undefined) onGenerate()
+    else setConfirmRegen(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [action])
 
   const performRegen = useCallback(async () => {
     setBusy(true)

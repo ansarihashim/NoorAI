@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -82,3 +82,12 @@ async def login(req: LoginRequest, db: AsyncSession = Depends(get_session)) -> A
 @router.get("/me", response_model=UserOut)
 async def me(user: User = Depends(get_current_user)) -> UserOut:
     return UserOut.from_user(user)
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+async def logout(user: User = Depends(get_current_user)) -> Response:
+    # JWT is stateless — the client drops the token. We log the event so logouts
+    # show up in the request log alongside logins, and we require a valid token
+    # so unauthenticated callers can't probe the endpoint.
+    logger.info("auth: logout user=%s", user.id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

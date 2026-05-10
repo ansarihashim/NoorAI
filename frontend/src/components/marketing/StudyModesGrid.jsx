@@ -95,13 +95,6 @@ function ModeCard({ mode, i }) {
       <p className="mt-2 text-[0.94rem] leading-relaxed text-echo-muted">
         {mode.description}
       </p>
-
-      <div className="mt-5 inline-flex items-center gap-1.5 text-[0.84rem] font-semibold text-echo-text underline decoration-echo-accent decoration-2 underline-offset-4 transition-colors duration-150 group-hover:text-echo-accent">
-        Explore mode
-        <svg viewBox="0 0 16 16" className="h-3 w-3 transition-transform duration-150 group-hover:translate-x-0.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M3 8h10M9 4l4 4-4 4" />
-        </svg>
-      </div>
     </motion.div>
   )
 }

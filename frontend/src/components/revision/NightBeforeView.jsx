@@ -29,7 +29,7 @@ const CAT_TONE = {
   high_yield: 'border-accent-amber/30 bg-accent-amber/[0.10] text-accent-amber',
 }
 
-export default function NightBeforeView({ docId }) {
+export default function NightBeforeView({ docId, action }) {
   const toast = useToast()
   const [set, setSet] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -73,6 +73,15 @@ export default function NightBeforeView({ docId }) {
     if (set) setConfirmRegen(true)
     else onGenerate()
   }, [set, onGenerate])
+
+  // Right-rail "Night-before pack" trigger.
+  useEffect(() => {
+    if (!action || !action.generate) return
+    if (busy || set === null) return
+    if (set === undefined) onGenerate()
+    else setConfirmRegen(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [action])
 
   const performRegen = useCallback(async () => {
     setBusy(true)

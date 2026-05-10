@@ -1,9 +1,47 @@
 const BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000'
 const TOKEN_KEY = 'echoverse.token'
 
+// Keys we persist in localStorage that are tied to the signed-in user. Cleared
+// on logout / forced sign-out so the next user (or the same user after token
+// expiry) starts from a clean slate.
+const USER_SCOPED_KEYS = [
+  TOKEN_KEY,
+  'echoverse.activeSources',
+  'echoverse.lastPosition',
+  'echoverse.bookmarks',
+]
+
+function decodeJwtPayload(token) {
+  try {
+    const part = token.split('.')[1]
+    if (!part) return null
+    // base64url → base64
+    const b64 = part.replace(/-/g, '+').replace(/_/g, '/').padEnd(part.length + ((4 - (part.length % 4)) % 4), '=')
+    const json = atob(b64)
+    return JSON.parse(json)
+  } catch {
+    return null
+  }
+}
+
+/** True iff the token has an `exp` claim and that exp is in the past. */
+export function isTokenExpired(token) {
+  const payload = decodeJwtPayload(token)
+  if (!payload || typeof payload.exp !== 'number') return false
+  // 10s skew so we don't fight clock drift.
+  return payload.exp * 1000 < Date.now() - 10_000
+}
+
 export function getToken() {
   try {
-    return localStorage.getItem(TOKEN_KEY)
+    const raw = localStorage.getItem(TOKEN_KEY)
+    if (!raw) return null
+    if (isTokenExpired(raw)) {
+      // Token has aged out client-side — drop it before returning.
+      clearAuthStorage()
+      return null
+    }
+    return raw
   } catch {
     return null
   }
@@ -13,6 +51,20 @@ export function setToken(token) {
   try {
     if (token) localStorage.setItem(TOKEN_KEY, token)
     else localStorage.removeItem(TOKEN_KEY)
+  } catch {
+    /* no-op */
+  }
+}
+
+/** Wipe every per-user key. Called on logout and on 401. */
+export function clearAuthStorage() {
+  try {
+    for (const key of USER_SCOPED_KEYS) localStorage.removeItem(key)
+    // Wipe any per-doc bookmark namespaces too (echoverse.bookmarks.*).
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const k = localStorage.key(i)
+      if (k && k.startsWith('echoverse.bookmarks.')) localStorage.removeItem(k)
+    }
   } catch {
     /* no-op */
   }
@@ -41,7 +93,7 @@ async function request(path, { method = 'GET', body, headers, isForm = false } =
   })
   if (res.status === 401) {
     // Notify the auth provider to clear state.
-    setToken(null)
+    clearAuthStorage()
     window.dispatchEvent(new CustomEvent('auth:unauthorized'))
   }
   const text = await res.text()
@@ -75,6 +127,15 @@ export async function login({ email, password }) {
 
 export async function me() {
   return request('/api/auth/me')
+}
+
+export async function logout() {
+  // Best-effort — we still clear local state even if the server is unreachable.
+  try {
+    await request('/api/auth/logout', { method: 'POST' })
+  } catch {
+    /* swallow; the client is the source of truth for "logged out" */
+  }
 }
 
 // ---------- documents ----------

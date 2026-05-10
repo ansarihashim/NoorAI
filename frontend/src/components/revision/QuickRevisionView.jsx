@@ -12,7 +12,7 @@ import Skeleton from '../ui/Skeleton.jsx'
 
 const TOPIC_OPTIONS = [5, 8, 10, 15]
 
-export default function QuickRevisionView({ docId }) {
+export default function QuickRevisionView({ docId, action }) {
   const toast = useToast()
   const [set, setSet] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -55,6 +55,15 @@ export default function QuickRevisionView({ docId }) {
     if (set) setConfirmRegen(true)
     else onGenerate()
   }, [set, onGenerate])
+
+  // Right-rail "Quick revision" trigger.
+  useEffect(() => {
+    if (!action || !action.generate) return
+    if (busy || set === null) return
+    if (set === undefined) onGenerate()
+    else setConfirmRegen(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [action])
 
   const performRegen = useCallback(async () => {
     setBusy(true)

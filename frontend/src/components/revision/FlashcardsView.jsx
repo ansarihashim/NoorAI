@@ -13,7 +13,7 @@ import FlashcardDeck from './FlashcardDeck.jsx'
 
 const N_OPTIONS = [10, 15, 20, 30]
 
-export default function FlashcardsView({ docId }) {
+export default function FlashcardsView({ docId, action }) {
   const toast = useToast()
   const [deck, setDeck] = useState(null) // null=loading, undefined=none, FlashcardSet=loaded
   const [busy, setBusy] = useState(false)
@@ -63,6 +63,17 @@ export default function FlashcardsView({ docId }) {
     }
     onGenerate()
   }, [deck, onGenerate])
+
+  // Right-rail "Generate flashcards" — auto-trigger when user clicks the
+  // action while we have no deck yet; if a deck exists, ask before replacing.
+  useEffect(() => {
+    if (!action || !action.generate) return
+    if (busy) return
+    if (deck === null) return
+    if (deck === undefined) onGenerate()
+    else setConfirmRegen(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [action])
 
   const performClearAndRegen = useCallback(async () => {
     setBusy(true)

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28" fill="none">
+  <path d="M5.4 6 L20.5 21.1 L17.6 24 L14.4 20.8 L9 23 L9.6 17.6 Z" fill="#000" opacity="0.5" transform="translate(0.6,0.6)"/>
+  <path d="M5 5 L20 20 L17 23 L13 19 L7 22 L8 16 Z" fill="#0A0A0A" stroke="#FFD60A" stroke-width="1.1" stroke-linejoin="round"/>
+  <path d="M4 4 L9 9 L7 11 L4 8 Z" fill="#FFE100" stroke="#FFFFFF" stroke-width="0.8" stroke-linejoin="round"/>
+  <!-- subtle glow halo around the nib only -->
+  <circle cx="5" cy="5" r="3.6" fill="#FFD60A" opacity="0.18"/>
+  <path d="M4 4 L5.6 5.6" stroke="#FFFFFF" stroke-width="1" stroke-linecap="round"/>
+</svg>
