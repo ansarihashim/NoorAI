@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import NoorMark from '../ui/NoorMark.jsx'
+import { FadeUp } from './primitives.jsx'
 
 const COLS = [
   {
@@ -35,6 +36,7 @@ export default function MarketingFooter() {
   return (
     <footer className="relative border-t border-echo-border bg-echo-bg/95">
       <div className="mx-auto max-w-7xl px-5 py-16 sm:px-8">
+       <FadeUp y={16} duration={0.7}>
         <div className="grid gap-12 lg:grid-cols-[1.4fr_3fr]">
           {/* Brand */}
           <div>
@@ -64,38 +66,43 @@ export default function MarketingFooter() {
 
           {/* Columns */}
           <div className="grid grid-cols-2 gap-10 sm:grid-cols-3">
-            {COLS.map((col) => (
-              <div key={col.title}>
-                <div className="text-[0.7rem] font-medium uppercase tracking-[0.2em] text-echo-muted">
-                  {col.title}
+            {COLS.map((col, i) => (
+              <FadeUp key={col.title} delay={0.08 + i * 0.07} y={12} duration={0.55}>
+                <div>
+                  <div className="text-[0.7rem] font-medium uppercase tracking-[0.2em] text-echo-muted">
+                    {col.title}
+                  </div>
+                  <ul className="mt-4 space-y-2.5">
+                    {col.links.map((l) => (
+                      <li key={l.label}>
+                        <a
+                          href={l.href}
+                          className="text-[0.92rem] text-echo-text/80 transition-colors duration-200 hover:text-echo-accent-soft"
+                        >
+                          {l.label}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-                <ul className="mt-4 space-y-2.5">
-                  {col.links.map((l) => (
-                    <li key={l.label}>
-                      <a
-                        href={l.href}
-                        className="text-[0.92rem] text-echo-text/80 transition-colors duration-200 hover:text-echo-accent-soft"
-                      >
-                        {l.label}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              </FadeUp>
             ))}
           </div>
         </div>
+       </FadeUp>
 
-        <div className="mt-14 flex flex-col items-start justify-between gap-4 border-t border-echo-border pt-6 sm:flex-row sm:items-center">
-          <p className="text-[0.78rem] text-echo-muted">
-            © {new Date().getFullYear()} NoorAI · A calmer way to study.
-          </p>
-          <div className="flex items-center gap-6 text-[0.78rem] text-echo-muted">
-            <Link to="/login" className="hover:text-echo-text">Sign in</Link>
-            <a href="#" className="hover:text-echo-text">Privacy</a>
-            <a href="#" className="hover:text-echo-text">Terms</a>
+        <FadeUp delay={0.2} y={10} duration={0.55}>
+          <div className="mt-14 flex flex-col items-start justify-between gap-4 border-t border-echo-border pt-6 sm:flex-row sm:items-center">
+            <p className="text-[0.78rem] text-echo-muted">
+              © {new Date().getFullYear()} NoorAI · A calmer way to study.
+            </p>
+            <div className="flex items-center gap-6 text-[0.78rem] text-echo-muted">
+              <Link to="/login" className="hover:text-echo-text">Sign in</Link>
+              <a href="#" className="hover:text-echo-text">Privacy</a>
+              <a href="#" className="hover:text-echo-text">Terms</a>
+            </div>
           </div>
-        </div>
+        </FadeUp>
       </div>
     </footer>
   )

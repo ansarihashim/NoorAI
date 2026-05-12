@@ -1,5 +1,5 @@
 import { motion, useReducedMotion } from 'framer-motion'
-import { SectionHeader, FadeUp } from './primitives.jsx'
+import { SectionHeader } from './primitives.jsx'
 
 const PAIRS = [
   {
@@ -124,13 +124,11 @@ export default function ProblemSolutions() {
           }
           subtitle="Built around the four moments most study tools ignore — when you're overwhelmed, drained, lost in jargon, or out of time."
         />
-        <FadeUp className="mt-16">
-          <div className="grid gap-5 lg:grid-cols-2">
-            {PAIRS.map((p, i) => (
-              <PairCard key={p.problem} pair={p} i={i} />
-            ))}
-          </div>
-        </FadeUp>
+        <div className="mt-16 grid gap-5 lg:grid-cols-2">
+          {PAIRS.map((p, i) => (
+            <PairCard key={p.problem} pair={p} i={i} />
+          ))}
+        </div>
       </div>
     </section>
   )

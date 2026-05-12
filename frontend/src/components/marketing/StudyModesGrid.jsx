@@ -1,5 +1,5 @@
 import { motion, useReducedMotion } from 'framer-motion'
-import { SectionHeader, FadeUp } from './primitives.jsx'
+import { SectionHeader } from './primitives.jsx'
 
 const MODES = [
   {
@@ -114,13 +114,11 @@ export default function StudyModesGrid() {
           subtitle="NoorAI adapts to where you are in the syllabus — from the first read to the night-before scramble."
         />
 
-        <FadeUp className="mt-16">
-          <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-            {MODES.map((m, i) => (
-              <ModeCard key={m.key} mode={m} i={i} />
-            ))}
-          </div>
-        </FadeUp>
+        <div className="mt-16 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+          {MODES.map((m, i) => (
+            <ModeCard key={m.key} mode={m} i={i} />
+          ))}
+        </div>
       </div>
     </section>
   )

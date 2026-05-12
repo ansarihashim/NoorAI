@@ -28,7 +28,7 @@ export default function InteractiveDemo() {
           subtitle="Drop a PDF — within seconds, NoorAI extracts concepts, generates an explanation, and lights the narration. You can interrupt at any time."
         />
 
-        <FadeUp className="mt-12" duration={0.6}>
+        <FadeUp className="mt-12" duration={0.8} y={32}>
           <div className="relative">
             <div className="relative overflow-hidden rounded-xl border border-echo-border bg-echo-surface">
               {/* window chrome */}
@@ -47,14 +47,12 @@ export default function InteractiveDemo() {
                 </div>
               </div>
 
-              {/* 3-pane layout */}
+              {/* 3-pane layout — each pane fades up on scroll with a small
+                  cascade so the screenshot reveals itself, not pops. */}
               <div className="grid grid-cols-1 gap-px bg-echo-border/60 lg:grid-cols-[1.1fr_1.4fr_1.1fr]">
-                {/* Pane 1: Sources */}
-                <SourcePane />
-                {/* Pane 2: Narration */}
-                <NarrationPane />
-                {/* Pane 3: AI reply */}
-                <ReplyPane />
+                <FadeUp delay={0.10} y={14} duration={0.55}><SourcePane /></FadeUp>
+                <FadeUp delay={0.22} y={14} duration={0.55}><NarrationPane /></FadeUp>
+                <FadeUp delay={0.34} y={14} duration={0.55}><ReplyPane /></FadeUp>
               </div>
 
               {/* timeline */}

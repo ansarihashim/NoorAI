@@ -1,3 +1,4 @@
+import { Children, isValidElement } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 
 /* Reusable motion wrappers for the marketing surface.
@@ -18,6 +19,47 @@ export function FadeUp({ children, delay = 0, y = 18, duration = 0.7, className 
     >
       {children}
     </motion.div>
+  )
+}
+
+/**
+ * StaggerGroup — reveal each direct child as it enters the viewport, with
+ * a small delay between consecutive children so a row of cards "cascades
+ * in" instead of all popping at once.
+ *
+ *   <StaggerGroup className="grid gap-4 md:grid-cols-3">
+ *     <Card .../>
+ *     <Card .../>
+ *     <Card .../>
+ *   </StaggerGroup>
+ *
+ * Internally each child is wrapped in a FadeUp with a computed delay
+ * (`i * stagger`). Container element stays a normal div so existing
+ * grid / flex classes apply unchanged.
+ */
+export function StaggerGroup({
+  children,
+  stagger = 0.08,
+  initialDelay = 0,
+  y = 20,
+  duration = 0.65,
+  className = '',
+  as: As = 'div',
+}) {
+  const items = Children.toArray(children).filter(Boolean)
+  return (
+    <As className={className}>
+      {items.map((child, i) => (
+        <FadeUp
+          key={isValidElement(child) && child.key != null ? child.key : i}
+          y={y}
+          duration={duration}
+          delay={initialDelay + i * stagger}
+        >
+          {child}
+        </FadeUp>
+      ))}
+    </As>
   )
 }
 
