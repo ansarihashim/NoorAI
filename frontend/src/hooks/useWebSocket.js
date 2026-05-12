@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { getToken } from '../lib/api.js'
+import { DEMO_MODE } from '../config/demo.js'
 
 // Resolve the WS endpoint at module load. Runtime safety net: if the page
 // is served over HTTPS (Vercel always is) and the env left us with a plain
@@ -37,7 +38,7 @@ function buildUrl() {
 export function useWebSocket({ onJson, onBytes } = {}) {
   const wsRef = useRef(null)
   const handlersRef = useRef({ onJson, onBytes })
-  const [status, setStatus] = useState('connecting')
+  const [status, setStatus] = useState(DEMO_MODE ? 'closed' : 'connecting')
   const backoffRef = useRef(INITIAL_BACKOFF_MS)
 
   useEffect(() => {
@@ -45,6 +46,12 @@ export function useWebSocket({ onJson, onBytes } = {}) {
   }, [onJson, onBytes])
 
   useEffect(() => {
+    // Demo mode: no backend, no WebSocket. Audio (narration / podcast) is
+    // rendered entirely client-side via the Web Speech API. Skipping the
+    // connection avoids the noisy `wss://localhost:8000` reconnect loop
+    // that would otherwise flood the console.
+    if (DEMO_MODE) return undefined
+
     let cancelled = false
     let currentWs = null
     let currentAbandon = null
