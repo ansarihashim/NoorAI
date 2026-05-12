@@ -1,17 +1,33 @@
-"""FAISS-backed RAG service.
+"""Pinecone-backed RAG service.
 
-Per-document index files live under STORAGE_DIR/rag/{doc_id}/
-  - index.faiss : the FAISS vector index
-  - chunks.json : the original text chunks, parallel to index rows
-  - meta.json   : document metadata (title, n_chunks, created_at)
+Vectors live in a single Pinecone serverless index, with one **namespace
+per document** (namespace == ``doc_id``) so retrieval is isolated by
+construction. Each vector carries ``{"chunk_idx": int}`` as metadata so a
+query result can map back to the source chunk text without round-tripping
+the body through the vector store.
+
+Per-document chunk text + metadata still live on disk under
+``STORAGE_DIR/rag/{doc_id}/``:
+  - chunks.json : narration + rag chunk arrays + parallel page-number arrays
+  - meta.json   : title, chunk counts, total pages, created_at
 
 On hosts without a persistent disk (Render free, Fly free, etc.) the disk
 gets wiped on every redeploy. To keep documents queryable across cold
-starts, we ALSO mirror each ingest to the ``rag_indices`` Postgres table
-(see ``app/db/migrations/versions/0003_rag_indices.py``). On read, if the
-on-disk artifacts are missing we hydrate them back from Postgres before
-proceeding. Disk stays the hot path; Postgres is only touched when
-necessary.
+starts, we mirror ``chunks.json`` + ``meta.json`` to the ``rag_indices``
+Postgres table (see ``app/db/migrations/versions/0003_rag_indices.py``).
+On read, if the on-disk artifacts are missing we hydrate them back from
+Postgres before proceeding. Pinecone vectors are durable independently of
+disk and never need re-hydration.
+
+The legacy FAISS index file (``index.faiss``) and the ``index_bytes`` blob
+in Postgres are no longer used. The Postgres column is kept (NOT NULL) and
+written with a single empty byte for backward compatibility; it can be
+dropped in a future migration.
+
+Embeddings come from the HuggingFace Inference API (see :meth:`_embed`).
+The dimension is fixed at 384 to match ``sentence-transformers/all-MiniLM-L6-v2``;
+if you change the embedding model, you must also recreate the Pinecone
+index with the new dimension and re-upload every document.
 """
 from __future__ import annotations
 
@@ -22,9 +38,9 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-import faiss
+import httpx
 import numpy as np
-from sentence_transformers import SentenceTransformer
+from pinecone import Pinecone, ServerlessSpec
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 
@@ -39,8 +55,29 @@ from app.utils.security_input import safe_join, validate_doc_id
 
 logger = logging.getLogger(__name__)
 
-EMBED_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+# Embedding geometry — kept at 384 to match all-MiniLM-L6-v2. If this
+# changes, the Pinecone index must be recreated with the matching dim.
 EMBED_DIM = 384
+
+# HF Inference API endpoint for sentence-transformer feature extraction.
+# The /pipeline/feature-extraction/ route returns sentence-level embeddings
+# directly (not token-level), so we don't need to mean-pool.
+_HF_BASE_URL = "https://api-inference.huggingface.co/pipeline/feature-extraction"
+
+# Max texts per HF request. Bounds payload size + retry cost.
+_HF_BATCH_SIZE = 64
+
+# How long a single HF embed call may take (cold model load can be ~20s
+# when wait_for_model is true).
+_HF_TIMEOUT_S = 60.0
+
+# Max vectors per Pinecone upsert call. Pinecone allows up to 100 per
+# request; we stay a hair below to leave headroom on metadata size.
+_PC_UPSERT_BATCH = 96
+
+# Sentinel byte written to the legacy ``index_bytes`` column so the NOT NULL
+# constraint stays satisfied without preserving the old FAISS payload.
+_LEGACY_INDEX_BYTES = b"\x00"
 
 
 @dataclass
@@ -60,13 +97,47 @@ class RagService:
     _lock = threading.Lock()
 
     def __init__(self) -> None:
-        logger.info("Loading embedding model: %s", EMBED_MODEL)
-        self._embedder = SentenceTransformer(EMBED_MODEL)
-        self._root = get_settings().storage_path / "rag"
+        s = get_settings()
+        # --- HF embedding client config ---
+        self._embed_model = s.huggingface_embed_model
+        self._hf_token = s.huggingface_api_token
+        if not self._hf_token:
+            logger.warning(
+                "HUGGINGFACE_API_TOKEN is not set; embedding calls will fail. "
+                "Get a free token at https://huggingface.co/settings/tokens"
+            )
+
+        # --- Pinecone client config ---
+        self._pc_api_key = s.pinecone_api_key
+        self._pc_index_name = s.pinecone_index_name
+        self._pc_cloud = s.pinecone_cloud
+        self._pc_region = s.pinecone_region
+        if not self._pc_api_key:
+            logger.warning(
+                "PINECONE_API_KEY is not set; vector storage will fail. "
+                "Get a free key at https://app.pinecone.io"
+            )
+
+        logger.info(
+            "RAG: embed=%s pinecone_index=%s",
+            self._embed_model, self._pc_index_name,
+        )
+
+        self._http: httpx.Client | None = None  # HF Inference API client
+        self._pc: Pinecone | None = None        # Pinecone client
+        self._pc_index = None                   # Pinecone Index handle
+
+        # Per-doc in-memory cache of chunk-text lists. We never cache vectors
+        # in-process anymore — Pinecone is the index of record.
+        self._cache: dict[str, list[str]] = {}
+
+        self._root = s.storage_path / "rag"
         self._root.mkdir(parents=True, exist_ok=True)
-        self._cache: dict[str, tuple[faiss.Index, list[str]]] = {}
-        self._pg: Engine | None = None  # lazy
-        self._pg_unavailable: bool = False  # sticky: don't keep retrying
+
+        # Postgres mirror — same role as before, but only for chunks_json +
+        # meta_json. The FAISS bytes path is dead.
+        self._pg: Engine | None = None
+        self._pg_unavailable: bool = False
 
     @classmethod
     def instance(cls) -> "RagService":
@@ -76,14 +147,53 @@ class RagService:
         return cls._instance
 
     # ---- doc_id sanitisation ----
-    # Every public method funnels its on-disk lookup through this helper.
-    # Any doc_id that doesn't match the strict regex (or escapes the storage
-    # root) is rejected before we touch the filesystem.
     def _doc_dir(self, doc_id: str) -> Path:
         validate_doc_id(doc_id)
         return safe_join(self._root, doc_id)
 
-    # ---- Postgres mirror (for hosts without persistent disk) -------------
+    # ---- Pinecone lazy init ------------------------------------------------
+
+    def _pc_client(self) -> Pinecone:
+        if self._pc is None:
+            if not self._pc_api_key:
+                raise RuntimeError(
+                    "PINECONE_API_KEY is not configured; cannot reach vector store."
+                )
+            self._pc = Pinecone(api_key=self._pc_api_key)
+        return self._pc
+
+    def _index(self):
+        """Return the Pinecone Index handle, creating the index if missing.
+
+        Index creation is idempotent — ``has_index`` short-circuits when the
+        index already exists, so the first call after a fresh deploy creates
+        it and subsequent calls just attach.
+        """
+        if self._pc_index is not None:
+            return self._pc_index
+        pc = self._pc_client()
+        try:
+            exists = pc.has_index(self._pc_index_name)
+        except AttributeError:
+            # Older SDK versions don't expose has_index; fall back to list.
+            exists = self._pc_index_name in [
+                ix.name for ix in pc.list_indexes()
+            ]
+        if not exists:
+            logger.info(
+                "Pinecone: creating index %s (dim=%d, cosine, %s/%s)",
+                self._pc_index_name, EMBED_DIM, self._pc_cloud, self._pc_region,
+            )
+            pc.create_index(
+                name=self._pc_index_name,
+                dimension=EMBED_DIM,
+                metric="cosine",
+                spec=ServerlessSpec(cloud=self._pc_cloud, region=self._pc_region),
+            )
+        self._pc_index = pc.Index(self._pc_index_name)
+        return self._pc_index
+
+    # ---- Postgres mirror (chunks_json + meta_json only) --------------------
 
     def _pg_engine(self) -> Engine | None:
         """Lazy sync SQLAlchemy engine for the rag_indices table.
@@ -100,14 +210,10 @@ class RagService:
         if not url:
             self._pg_unavailable = True
             return None
-        # SQLAlchemy sync engines need a sync driver. Our app uses
-        # postgresql+asyncpg://… for the async stack; strip the suffix.
         sync_url = url.replace("+asyncpg", "")
-        # asyncpg uses ?ssl=require; psycopg2 uses ?sslmode=require.
         sync_url = sync_url.replace("ssl=require", "sslmode=require")
         try:
             self._pg = create_engine(sync_url, pool_pre_ping=True, pool_recycle=300, future=True)
-            # Cheap probe so a bad URL fails fast.
             with self._pg.connect() as c:
                 c.execute(text("SELECT 1"))
             return self._pg
@@ -117,7 +223,9 @@ class RagService:
             self._pg_unavailable = True
             return None
 
-    def _save_to_pg(self, doc_id: str, index_bytes: bytes, chunks_json: str, meta_json: str) -> None:
+    def _save_to_pg(self, doc_id: str, chunks_json: str, meta_json: str) -> None:
+        """Mirror chunks + meta to Postgres. ``index_bytes`` gets a sentinel
+        byte to satisfy the legacy NOT NULL constraint."""
         eng = self._pg_engine()
         if eng is None:
             return
@@ -137,18 +245,16 @@ class RagService:
                     ),
                     {
                         "doc_id":      doc_id,
-                        "index_bytes": index_bytes,
+                        "index_bytes": _LEGACY_INDEX_BYTES,
                         "chunks_json": chunks_json,
                         "meta_json":   meta_json,
                     },
                 )
         except Exception as exc:
-            # Table missing (migration not run yet) or transient DB issue —
-            # don't fail the user's upload over this; disk write already
-            # succeeded.
             logger.warning("rag: failed to mirror to Postgres (%s)", exc)
 
-    def _load_from_pg(self, doc_id: str) -> tuple[bytes, str, str] | None:
+    def _load_from_pg(self, doc_id: str) -> tuple[str, str] | None:
+        """Return ``(chunks_json, meta_json)`` if the doc is mirrored, else None."""
         eng = self._pg_engine()
         if eng is None:
             return None
@@ -156,7 +262,7 @@ class RagService:
             with eng.connect() as conn:
                 row = conn.execute(
                     text(
-                        "SELECT index_bytes, chunks_json, meta_json "
+                        "SELECT chunks_json, meta_json "
                         "FROM rag_indices WHERE doc_id = :doc_id"
                     ),
                     {"doc_id": doc_id},
@@ -166,28 +272,26 @@ class RagService:
             return None
         if row is None:
             return None
-        return bytes(row[0]), row[1], row[2]
+        return row[0], row[1]
 
     def _hydrate_from_pg(self, doc_id: str) -> bool:
-        """If a doc lives in Postgres but not on disk, write it to disk.
-
-        Returns True iff hydration happened (caller can now read from disk).
-        """
+        """If a doc's chunks/meta live in Postgres but not on disk, restore
+        them. Returns True iff hydration happened."""
         doc_dir = safe_join(self._root, doc_id)
-        if (doc_dir / "index.faiss").exists():
+        if (doc_dir / "chunks.json").exists():
             return False
         row = self._load_from_pg(doc_id)
         if row is None:
             return False
-        index_bytes, chunks_json, meta_json = row
+        chunks_json, meta_json = row
         doc_dir.mkdir(parents=True, exist_ok=True)
-        (doc_dir / "index.faiss").write_bytes(index_bytes)
         (doc_dir / "chunks.json").write_text(chunks_json, encoding="utf-8")
         (doc_dir / "meta.json").write_text(meta_json, encoding="utf-8")
-        logger.info("rag: hydrated doc=%s from Postgres mirror", doc_id)
+        logger.info("rag: hydrated doc=%s chunks/meta from Postgres mirror", doc_id)
         return True
 
-    # ---- ingest ----
+    # ---- ingest ------------------------------------------------------------
+
     def ingest(
         self,
         doc_id: str,
@@ -196,17 +300,13 @@ class RagService:
         *,
         pages: list[tuple[int, str]] | None = None,
     ) -> DocumentBundle:
-        """Chunk + embed + persist a document.
+        """Chunk + embed + upsert into Pinecone + persist chunk text on disk.
 
         Two modes:
           - ``pages`` is None: legacy plain-text — no per-page citations.
           - ``pages`` is provided: page-aware mode. Each chunk records the
             page it came from so the UI can render "Page 12" instead of
             "chunk #3".
-
-        ``text`` is still accepted in page-aware mode for callers that want
-        to pass a flat string for fallback; if both are present, ``pages``
-        wins.
         """
         validate_doc_id(doc_id)
 
@@ -230,13 +330,39 @@ class RagService:
         if not rag:
             raise ValueError("No content to index after chunking")
 
+        # 1. Embed every RAG chunk via HF Inference API.
         embeddings = self._embed(rag)
-        index = faiss.IndexFlatIP(EMBED_DIM)
-        index.add(embeddings)
 
+        # 2. Upsert into Pinecone, namespaced by doc_id.
+        # If this doc was previously ingested, wipe the namespace first so
+        # stale vectors from a prior upload don't survive a re-ingest.
+        index = self._index()
+        try:
+            index.delete(delete_all=True, namespace=doc_id)
+        except Exception as exc:
+            # A 404 here means the namespace simply doesn't exist yet, which
+            # is the common case on first ingest. Log and continue.
+            logger.debug("pinecone: pre-ingest delete skipped (%s)", exc)
+
+        vectors = [
+            {
+                "id": f"{doc_id}#{i}",
+                "values": embeddings[i].tolist(),
+                "metadata": {
+                    "chunk_idx": int(i),
+                    "page": int(rag_pages[i]) if rag_pages[i] is not None else -1,
+                },
+            }
+            for i in range(len(rag))
+        ]
+        for start in range(0, len(vectors), _PC_UPSERT_BATCH):
+            batch = vectors[start : start + _PC_UPSERT_BATCH]
+            index.upsert(vectors=batch, namespace=doc_id)
+
+        # 3. Persist chunk text + meta on disk (used by narration, citations,
+        # and the LangChain retriever's "give me chunk text by index" path).
         doc_dir = safe_join(self._root, doc_id)
         doc_dir.mkdir(parents=True, exist_ok=True)
-        faiss.write_index(index, str(doc_dir / "index.faiss"))
         chunks_json = json.dumps({
             "rag": rag,
             "narration": narration,
@@ -254,30 +380,42 @@ class RagService:
         (doc_dir / "chunks.json").write_text(chunks_json, encoding="utf-8")
         (doc_dir / "meta.json").write_text(meta_json, encoding="utf-8")
 
-        # Mirror to Postgres so the doc survives disk wipes on ephemeral
-        # hosts. Best-effort: a DB outage must not fail an in-flight upload.
+        # 4. Mirror chunks/meta to Postgres so the doc survives Render's
+        # disk wipe. Best-effort: DB outage must not fail an in-flight upload.
         try:
-            index_bytes = bytes(faiss.serialize_index(index))
-            self._save_to_pg(doc_id, index_bytes, chunks_json, meta_json)
+            self._save_to_pg(doc_id, chunks_json, meta_json)
         except Exception:
-            logger.exception("rag: serializing FAISS for Postgres mirror failed")
+            logger.exception("rag: Postgres mirror write failed")
 
-        # Warm cache
-        self._cache[doc_id] = (index, rag)
+        # 5. Warm in-process chunk-text cache.
+        self._cache[doc_id] = rag
+
         return DocumentBundle(
             doc_id=doc_id, title=title, narration=narration, rag=rag,
             narration_pages=narration_pages, rag_pages=rag_pages,
             total_pages=total_pages,
         )
 
-    # ---- retrieve ----
+    # ---- retrieve ----------------------------------------------------------
+
     def retrieve(self, doc_id: str, query: str, k: int = 4) -> list[str]:
-        index, chunks = self._load(doc_id)
         if not query.strip():
             return []
-        q = self._embed([query])
-        scores, ids = index.search(q, min(k, len(chunks)))
-        return [chunks[i] for i in ids[0] if 0 <= i < len(chunks)]
+        chunks = self._load_chunks(doc_id)
+        if not chunks:
+            return []
+        q_vec = self._embed([query])[0].tolist()
+        result = self._index().query(
+            namespace=doc_id,
+            vector=q_vec,
+            top_k=min(k, len(chunks)),
+            include_metadata=True,
+        )
+        return [
+            chunks[idx]
+            for idx in self._chunk_idxs_from_matches(result)
+            if 0 <= idx < len(chunks)
+        ]
 
     def retrieve_with_indices(
         self, doc_id: str, query: str, k: int = 4
@@ -286,21 +424,56 @@ class RagService:
 
         Used by the LangChain wrapper (``EchoVerseRetriever``) so downstream
         chains can carry the chunk index in Document metadata for citations.
-        Without this method every chain call to the wrapper raises
-        AttributeError, the chain swallows it, and the context silently
-        becomes "(no notes available)" — which is what was breaking the
-        Simplest-Explanation feature.
         """
-        index, chunks = self._load(doc_id)
         if not query.strip():
             return []
-        q = self._embed([query])
-        _scores, ids = index.search(q, min(k, len(chunks)))
-        return [(int(i), chunks[i]) for i in ids[0] if 0 <= i < len(chunks)]
+        chunks = self._load_chunks(doc_id)
+        if not chunks:
+            return []
+        q_vec = self._embed([query])[0].tolist()
+        result = self._index().query(
+            namespace=doc_id,
+            vector=q_vec,
+            top_k=min(k, len(chunks)),
+            include_metadata=True,
+        )
+        out: list[tuple[int, str]] = []
+        for idx in self._chunk_idxs_from_matches(result):
+            if 0 <= idx < len(chunks):
+                out.append((idx, chunks[idx]))
+        return out
 
-    # ---- read-only helpers ----
+    @staticmethod
+    def _chunk_idxs_from_matches(result) -> list[int]:
+        """Pull ``chunk_idx`` (int) out of each match in a Pinecone query
+        result. Robust to both attribute-style and dict-style match objects
+        across SDK versions."""
+        if hasattr(result, "matches"):
+            matches = result.matches or []
+        elif isinstance(result, dict):
+            matches = result.get("matches", []) or []
+        else:
+            matches = []
+
+        out: list[int] = []
+        for m in matches:
+            md = getattr(m, "metadata", None)
+            if md is None and isinstance(m, dict):
+                md = m.get("metadata")
+            if not md:
+                continue
+            ci = md.get("chunk_idx") if hasattr(md, "get") else None
+            if ci is None:
+                continue
+            try:
+                out.append(int(ci))
+            except (TypeError, ValueError):
+                continue
+        return out
+
+    # ---- read-only helpers -------------------------------------------------
+
     def _read_chunks_json(self, doc_id: str) -> dict:
-        """Read chunks.json from disk, hydrating from Postgres on miss."""
         doc_dir = self._doc_dir(doc_id)
         path = doc_dir / "chunks.json"
         if not path.exists():
@@ -313,11 +486,9 @@ class RagService:
         return list(self._read_chunks_json(doc_id).get("narration", []))
 
     def get_rag_pages(self, doc_id: str) -> list[int | None]:
-        """Parallel array to the RAG chunk list. ``None`` if page unknown."""
         data = self._read_chunks_json(doc_id)
         if "rag_pages" in data and isinstance(data["rag_pages"], list):
             return [(int(x) if x is not None else None) for x in data["rag_pages"]]
-        # Legacy doc — no page metadata captured at ingest time.
         return [None] * len(data.get("rag", []))
 
     def get_narration_pages(self, doc_id: str) -> list[int | None]:
@@ -340,8 +511,7 @@ class RagService:
             n = json.loads(meta_path.read_text(encoding="utf-8")).get("n_rag")
             if isinstance(n, int):
                 return n
-        _, chunks = self._load(doc_id)
-        return len(chunks)
+        return len(self._load_chunks(doc_id))
 
     def exists(self, doc_id: str) -> bool:
         # exists() is called with raw user input; return False on bad IDs
@@ -350,36 +520,144 @@ class RagService:
             doc_dir = self._doc_dir(doc_id)
         except Exception:
             return False
-        if (doc_dir / "index.faiss").exists():
+        if (doc_dir / "chunks.json").exists():
             return True
         # Disk wiped (e.g. Render free cold start). Check Postgres mirror;
         # if it has the doc, hydrate to disk so callers can proceed.
         return self._hydrate_from_pg(doc_id)
 
-    # ---- internals ----
-    def _load(self, doc_id: str) -> tuple[faiss.Index, list[str]]:
+    # ---- delete ------------------------------------------------------------
+
+    def delete(self, doc_id: str) -> None:
+        """Remove a document's vectors from Pinecone and its Postgres mirror
+        row. On-disk artifacts are cleaned up by the calling route (see
+        ``api/documents.py``) so callers can decide if they want to keep
+        chunks/meta cached locally. Best-effort: each failure is logged but
+        does not abort the others."""
         validate_doc_id(doc_id)
-        if doc_id in self._cache:
-            return self._cache[doc_id]
-        doc_dir = safe_join(self._root, doc_id)
-        if not (doc_dir / "index.faiss").exists():
-            self._hydrate_from_pg(doc_id)
-        if not (doc_dir / "index.faiss").exists():
-            raise FileNotFoundError(f"No FAISS index for doc_id={doc_id}")
-        index = faiss.read_index(str(doc_dir / "index.faiss"))
-        data = json.loads((doc_dir / "chunks.json").read_text(encoding="utf-8"))
-        rag = list(data.get("rag", []))
-        self._cache[doc_id] = (index, rag)
-        return index, rag
+        try:
+            self._index().delete(delete_all=True, namespace=doc_id)
+        except Exception:
+            logger.exception("pinecone: delete namespace %s failed", doc_id)
+
+        eng = self._pg_engine()
+        if eng is not None:
+            try:
+                with eng.begin() as conn:
+                    conn.execute(
+                        text("DELETE FROM rag_indices WHERE doc_id = :doc_id"),
+                        {"doc_id": doc_id},
+                    )
+            except Exception:
+                logger.exception("rag: failed to delete Postgres mirror for %s", doc_id)
+
+        self._cache.pop(doc_id, None)
+
+    # ---- internals ---------------------------------------------------------
+
+    def _load_chunks(self, doc_id: str) -> list[str]:
+        """Return the RAG chunk-text array for a doc, cached in memory."""
+        validate_doc_id(doc_id)
+        cached = self._cache.get(doc_id)
+        if cached is not None:
+            return cached
+        data = self._read_chunks_json(doc_id)
+        if not data:
+            return []
+        chunks = list(data.get("rag", []))
+        self._cache[doc_id] = chunks
+        return chunks
+
+    def _load(self, doc_id: str):
+        """Back-compat shim for ``EchoVerseRetriever.fetch_all`` which expects
+        a ``(index, chunks)`` tuple. The first element is no longer used —
+        Pinecone is the index — so we return ``None`` for it.
+        """
+        chunks = self._load_chunks(doc_id)
+        if not chunks:
+            raise FileNotFoundError(f"No chunks available for doc_id={doc_id}")
+        return None, chunks
+
+    # ---- embeddings (HuggingFace Inference API) ----------------------------
 
     def _embed(self, texts: list[str]) -> np.ndarray:
-        emb = self._embedder.encode(
-            texts,
-            normalize_embeddings=True,    # cosine via inner product
-            convert_to_numpy=True,
-            show_progress_bar=False,
-        )
-        return emb.astype(np.float32)
+        """Return ``(N, EMBED_DIM)`` float32 embeddings for ``texts``.
+
+        Pinecone's ``metric="cosine"`` handles normalisation internally, so
+        we don't normalise here. The output is raw HF feature-extraction
+        vectors batched into a single numpy array for upstream code.
+        """
+        if not texts:
+            return np.zeros((0, EMBED_DIM), dtype=np.float32)
+        if not self._hf_token:
+            raise RuntimeError(
+                "HUGGINGFACE_API_TOKEN is not configured; cannot embed."
+            )
+
+        out: list[list[float]] = []
+        for i in range(0, len(texts), _HF_BATCH_SIZE):
+            batch = texts[i : i + _HF_BATCH_SIZE]
+            out.extend(self._hf_embed_batch(batch))
+
+        arr = np.asarray(out, dtype=np.float32)
+        if arr.ndim != 2 or arr.shape[1] != EMBED_DIM:
+            raise RuntimeError(
+                f"HF embedding shape mismatch: got {arr.shape}, "
+                f"expected (*, {EMBED_DIM})"
+            )
+        return arr
+
+    def _hf_client(self) -> httpx.Client:
+        if self._http is None:
+            self._http = httpx.Client(
+                timeout=_HF_TIMEOUT_S,
+                headers={
+                    "Authorization": f"Bearer {self._hf_token}",
+                    "Accept": "application/json",
+                },
+            )
+        return self._http
+
+    def _hf_embed_batch(self, batch: list[str]) -> list[list[float]]:
+        """Call the HF Inference API once for up to ``_HF_BATCH_SIZE`` strings.
+
+        On 503 ("model is loading") we retry once with ``wait_for_model`` so
+        the first cold call after deploy doesn't fail spuriously.
+        """
+        url = f"{_HF_BASE_URL}/{self._embed_model}"
+        client = self._hf_client()
+        payload: dict = {"inputs": batch, "options": {"wait_for_model": True}}
+
+        for attempt in (1, 2):
+            try:
+                resp = client.post(url, json=payload)
+            except httpx.HTTPError as exc:
+                if attempt == 1:
+                    logger.warning("HF embed transport error (%s); retrying", exc)
+                    continue
+                raise RuntimeError(f"HF embed request failed: {exc}") from exc
+
+            if resp.status_code == 200:
+                data = resp.json()
+                if isinstance(data, list) and data and isinstance(data[0], (int, float)):
+                    data = [data]
+                if not isinstance(data, list):
+                    raise RuntimeError(
+                        f"HF embed: unexpected response shape: {type(data).__name__}"
+                    )
+                return data
+
+            if resp.status_code == 503 and attempt == 1:
+                logger.info(
+                    "HF model loading (status 503); retrying once with wait_for_model"
+                )
+                continue
+
+            raise RuntimeError(
+                f"HF embed HTTP {resp.status_code}: {resp.text[:200]}"
+            )
+
+        raise RuntimeError("HF embed: exhausted retries")
 
 
 def get_rag() -> RagService:

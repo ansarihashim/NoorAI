@@ -117,6 +117,14 @@ async def delete_document(
     await db.execute(delete(Document).where(Document.id == doc_id))
     await db.commit()
 
+    # Drop the document's Pinecone namespace + Postgres mirror row. Best-
+    # effort: a failure here is logged but does not abort on-disk cleanup
+    # or the user's request.
+    try:
+        get_rag().delete(doc_id)
+    except Exception:
+        logger.exception("documents: rag.delete failed for %s", doc_id)
+
     # Best-effort cleanup of on-disk artifacts. safe_join belt-and-braces:
     # if the regex check above ever regresses, safe_join still refuses paths
     # that don't resolve under storage_path.

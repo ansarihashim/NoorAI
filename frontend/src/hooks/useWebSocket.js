@@ -31,19 +31,22 @@ function buildUrl() {
  * Persistent WebSocket with exponential-backoff reconnect, heartbeat, and
  * StrictMode-safe cleanup.
  *
+ * The server-to-client protocol is JSON-only now; binary audio frames were
+ * removed when voice barge-in was retired. Any binary message that arrives
+ * (from a stale build or a misbehaving peer) is silently ignored.
+ *
  * @param {object} handlers
  * @param {(msg: object) => void} handlers.onJson    JSON control frames from server
- * @param {(buf: ArrayBuffer) => void} handlers.onBytes  binary audio frames from server
  */
-export function useWebSocket({ onJson, onBytes } = {}) {
+export function useWebSocket({ onJson } = {}) {
   const wsRef = useRef(null)
-  const handlersRef = useRef({ onJson, onBytes })
+  const handlersRef = useRef({ onJson })
   const [status, setStatus] = useState(DEMO_MODE ? 'closed' : 'connecting')
   const backoffRef = useRef(INITIAL_BACKOFF_MS)
 
   useEffect(() => {
-    handlersRef.current = { onJson, onBytes }
-  }, [onJson, onBytes])
+    handlersRef.current = { onJson }
+  }, [onJson])
 
   useEffect(() => {
     // Demo mode: no backend, no WebSocket. Audio (narration / podcast) is
@@ -60,7 +63,6 @@ export function useWebSocket({ onJson, onBytes } = {}) {
     const connect = () => {
       const url = buildUrl()
       const ws = new WebSocket(url)
-      ws.binaryType = 'arraybuffer'
       wsRef.current = ws
       currentWs = ws
       setStatus('connecting')
@@ -103,19 +105,16 @@ export function useWebSocket({ onJson, onBytes } = {}) {
 
       ws.onmessage = (ev) => {
         if (abandoned) return
-        if (typeof ev.data === 'string') {
-          let obj
-          try {
-            obj = JSON.parse(ev.data)
-          } catch (err) {
-            console.warn('[ws] bad json from server', err, ev.data)
-            return
-          }
-          if (obj.type === 'pong') return
-          handlersRef.current.onJson?.(obj)
-        } else {
-          handlersRef.current.onBytes?.(ev.data)
+        if (typeof ev.data !== 'string') return  // binary frames no longer used
+        let obj
+        try {
+          obj = JSON.parse(ev.data)
+        } catch (err) {
+          console.warn('[ws] bad json from server', err, ev.data)
+          return
         }
+        if (obj.type === 'pong') return
+        handlersRef.current.onJson?.(obj)
       }
 
       ws.onerror = (ev) => {
@@ -173,12 +172,5 @@ export function useWebSocket({ onJson, onBytes } = {}) {
     }
   }, [])
 
-  const sendBytes = useCallback((buf) => {
-    const ws = wsRef.current
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(buf)
-    }
-  }, [])
-
-  return { status, sendJson, sendBytes }
+  return { status, sendJson }
 }

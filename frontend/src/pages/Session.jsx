@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation, useParams } from 'react-router-dom'
 import { useWebSocket } from '../hooks/useWebSocket.js'
-import { useAudioPlayer } from '../hooks/useAudioPlayer.js'
 import { getDoc } from '../lib/api.js'
 import { CitationsProvider } from '../lib/citations.jsx'
 import { useToast } from '../components/ui/Toast.jsx'
@@ -14,9 +13,10 @@ import RevisionView from '../components/revision/RevisionView.jsx'
 
 /**
  * Session = the center column when a document is open.
- * Owns the narration WebSocket. Podcast state lives in PodcastSessionContext
- * (mounted at WorkspaceShell level) so center playback and the right-rail
- * transcript share one source of truth.
+ * Holds a session-level WebSocket for podcast / server-pushed events.
+ * Podcast state lives in PodcastSessionContext (mounted at WorkspaceShell
+ * level) so center playback and the right-rail transcript share one source
+ * of truth.
  */
 
 function loadPosition(docId) {
@@ -44,10 +44,8 @@ export default function Session() {
   const [doc, setDoc] = useState(routeState?.doc || null)
   const [, setDocTitle] = useState(routeState?.doc?.title || 'Loading…')
 
-  // ---- narration WS state ----
+  // ---- session WS state ----
   const [serverState, setServerState] = useState('idle')
-  const [messages, setMessages] = useState([])
-  const [interruption, setInterruption] = useState(null)
 
   // Restore last mode on first load of this doc; default to preparation.
   useEffect(() => {
@@ -84,26 +82,12 @@ export default function Session() {
     return () => { cancelled = true }
   }, [docId, doc, toast])
 
-  // -------- WebSocket for narration interruption + Q&A --------
+  // -------- WebSocket for server-pushed session events (state + podcast) --------
   const onJson = useCallback(
     (msg) => {
       switch (msg.type) {
         case 'state':
           setServerState(msg.value)
-          break
-        case 'transcript':
-          if (msg.role === 'user' || msg.role === 'assistant') {
-            setMessages((m) => [...m, { role: msg.role, text: msg.text }])
-          }
-          break
-        case 'interruption_dismissed':
-          setInterruption({ reason: msg.reason, message: msg.message })
-          setTimeout(() => {
-            setInterruption((cur) => (cur && cur.reason === msg.reason ? null : cur))
-          }, 6000)
-          break
-        case 'flush_audio':
-          window.dispatchEvent(new CustomEvent('echoverse:flush_audio'))
           break
         case 'error':
           toast.error('Server error', msg.message || 'unknown')
@@ -115,19 +99,7 @@ export default function Session() {
     [toast],
   )
 
-  // Shared streaming audio sink for Ask-a-Doubt replies. Lifted to Session so
-  // every mode (narration, podcast, …) plays Q&A audio through the same
-  // MediaSource — no need to register `window.__echoverse_qa_player` per mode.
-  const qaPlayer = useAudioPlayer()
-  const onBytes = useCallback((buf) => { qaPlayer.push(buf) }, [qaPlayer])
-
-  useEffect(() => {
-    function onFlush() { qaPlayer.flush() }
-    window.addEventListener('echoverse:flush_audio', onFlush)
-    return () => window.removeEventListener('echoverse:flush_audio', onFlush)
-  }, [qaPlayer])
-
-  const { status: wsStatus, sendJson, sendBytes } = useWebSocket({ onJson, onBytes })
+  const { status: wsStatus, sendJson } = useWebSocket({ onJson })
 
   // When mode switches, stop any in-flight playback so the new mode starts clean.
   useEffect(() => {
@@ -165,10 +137,6 @@ export default function Session() {
             serverState={serverState}
             wsStatus={wsStatus}
             sendJson={sendJson}
-            sendBytes={sendBytes}
-            messages={messages}
-            interruption={interruption}
-            clearInterruption={() => setInterruption(null)}
             initialChapter={lastPos.mode === 'narration' ? lastPos.narrationIdx : undefined}
             initialLocalTime={lastPos.mode === 'narration' ? lastPos.narrationTime : undefined}
             onPositionChange={persistNarrationPosition}
@@ -182,8 +150,6 @@ export default function Session() {
               serverState={serverState}
               wsStatus={wsStatus}
               sendJson={sendJson}
-              sendBytes={sendBytes}
-              messages={messages}
             />
           </div>
         )}

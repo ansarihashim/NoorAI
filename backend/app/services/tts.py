@@ -1,15 +1,13 @@
-"""Text-to-speech with a three-tier fallback.
+"""Text-to-speech with a two-tier fallback.
 
   1. ElevenLabs streaming (paid plan or free-tier-allowed voice)
-  2. Google Cloud TTS  (only if a real service account is configured —
-                       Cloud TTS does NOT accept API keys)
-  3. Microsoft Edge TTS (free, no auth, high-quality neural voices)
+  2. Microsoft Edge TTS (free, no auth, high-quality neural voices)
 
-All three paths emit MP3 byte chunks via an async iterator so the calling
-code stays uniform. Tier 3 guarantees audio output even when the cloud
-providers are misconfigured, so narration always plays in development.
+Both paths emit MP3 byte chunks via an async iterator so the calling code
+stays uniform. Tier 2 guarantees audio output even when ElevenLabs is
+misconfigured or out of budget, so narration always plays.
 
-If a tier hits a permanent auth/billing error (401/402/403) it is
+If ElevenLabs hits a permanent auth/billing error (401/402/403) it is
 "sticky-disabled" for the remainder of the process — we don't keep
 re-trying a provider that just told us "no" for every single chunk.
 """
@@ -35,7 +33,6 @@ def _is_permanent_auth_error(exc: Exception) -> bool:
         "401", "402", "403",
         "Unauthorized", "Unauthenticated",
         "payment_required", "paid_plan_required",
-        "API keys are not supported",
         "Forbidden",
     )
     return any(n in text for n in needles)
@@ -47,24 +44,18 @@ class TtsService:
         self._eleven_api_key = s.elevenlabs_api_key
         self._eleven_voice_id = s.elevenlabs_voice_id
         self._eleven_model = s.elevenlabs_model
-        self._google_api_key = s.google_tts_api_key
-        self._google_creds_path = s.google_application_credentials
 
         self._eleven_client = None
-        self._google_client = None
 
         self._chars_today = 0
         self._daily_cap = s.elevenlabs_chars_per_day
 
-        # sticky-disable flags so we don't hammer dead providers
+        # sticky-disable flag so we don't hammer a dead provider
         self._eleven_disabled = not bool(self._eleven_api_key)
-        # API keys are NOT supported by Cloud TTS - require a real service account
-        self._google_disabled = not bool(self._google_creds_path)
 
         logger.info(
-            "TTS init: eleven=%s google=%s edge=enabled",
+            "TTS init: eleven=%s edge=enabled",
             "enabled" if not self._eleven_disabled else "disabled (no key)",
-            "enabled" if not self._google_disabled else "disabled (need GOOGLE_APPLICATION_CREDENTIALS, API key alone is not accepted by Cloud TTS)",
         )
 
     # ---- public ----
@@ -72,7 +63,7 @@ class TtsService:
         """Yield MP3 byte chunks for the given text, falling through providers.
 
         If ``voice_id`` is provided, ElevenLabs uses it instead of the default.
-        Google + Edge fallbacks ignore voice_id (they don't share IDs).
+        The Edge fallback ignores voice_id (it doesn't share IDs with ElevenLabs).
         """
         text = text.strip()
         if not text:
@@ -100,21 +91,7 @@ class TtsService:
                 if tier_yielded_any:
                     raise TtsError(f"elevenlabs failed mid-stream: {exc}") from exc
 
-        # Tier 2: Google Cloud TTS
-        if not self._google_disabled:
-            try:
-                audio = await self._google_synthesize(text)
-                if audio:
-                    yield audio
-                    return
-            except Exception as exc:
-                if _is_permanent_auth_error(exc):
-                    logger.error("Google TTS permanently disabled this session: %s", exc)
-                    self._google_disabled = True
-                else:
-                    logger.warning("Google TTS transient error: %s — falling back", exc)
-
-        # Tier 3: Edge TTS (always available, no auth)
+        # Tier 2: Edge TTS (always available, no auth)
         try:
             async for chunk in self._edge_stream(text):
                 yield chunk
@@ -167,32 +144,6 @@ class TtsService:
                 yield item
         finally:
             producer.cancel()
-
-    # ---- Google TTS ----
-    async def _google_synthesize(self, text: str) -> bytes:
-        try:
-            from google.cloud import texttospeech
-        except ImportError as exc:
-            raise TtsError("google-cloud-texttospeech not installed") from exc
-
-        if self._google_client is None:
-            # Cloud TTS requires service-account credentials. Plain API keys
-            # do not work for this API and produce a 401.
-            self._google_client = texttospeech.TextToSpeechAsyncClient()
-
-        synthesis_input = texttospeech.SynthesisInput(text=text)
-        voice = texttospeech.VoiceSelectionParams(
-            language_code="en-US",
-            name="en-US-Neural2-C",
-        )
-        audio_config = texttospeech.AudioConfig(
-            audio_encoding=texttospeech.AudioEncoding.MP3,
-            speaking_rate=1.0,
-        )
-        response = await self._google_client.synthesize_speech(
-            input=synthesis_input, voice=voice, audio_config=audio_config
-        )
-        return response.audio_content
 
     # ---- Edge TTS (free, no auth) ----
     async def _edge_stream(self, text: str) -> AsyncIterator[bytes]:

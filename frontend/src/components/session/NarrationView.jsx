@@ -1,6 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { useSearchParams } from 'react-router-dom'
 import { useAudio } from '../../hooks/useAudio.js'
 import { useMediaSession } from '../../hooks/useMediaSession.js'
 import { useKeyboardControls } from '../../hooks/useKeyboardControls.js'
@@ -17,23 +15,18 @@ import { useToast } from '../ui/Toast.jsx'
 /**
  * Narration mode — calm reading with TTS playback.
  *
- * The voice-Q&A loop ("Ask a doubt") was removed: narration is now a
- * one-way listen experience driven entirely by the cached chunk audio.
- * The session-level WebSocket and mic stream are still available for any
- * future feature, but this mode does not open the microphone.
+ * One-way listen experience driven by cached chunk audio served over HTTP.
+ * The voice-Q&A barge-in loop, interruption banner, and mic stream were
+ * removed along with the Whisper backend.
  */
 export default function NarrationView({
   docId,
-  serverState,                     // kept in props for the FSM reader pane
   // eslint-disable-next-line no-unused-vars
-  wsStatus,                        // unused after ask-a-doubt removal; kept for compat
+  serverState,                     // unused after ask-a-doubt removal; kept for compat
+  // eslint-disable-next-line no-unused-vars
+  wsStatus,
   // eslint-disable-next-line no-unused-vars
   sendJson,
-  // eslint-disable-next-line no-unused-vars
-  sendBytes,
-  messages,
-  interruption,
-  clearInterruption,
   initialChapter,
   initialLocalTime,
   onPositionChange,
@@ -42,9 +35,6 @@ export default function NarrationView({
   const { host: hostVoiceId } = useVoicePrefs()
   const voiceId = hostVoiceId || undefined
   const [manifest, setManifest] = useState(null)
-  const [warn, setWarn] = useState('')
-  const [searchParams, setSearchParams] = useSearchParams()
-  const action = searchParams.get('action')
 
   // -------- manifest fetch --------
   useEffect(() => {
@@ -108,12 +98,6 @@ export default function NarrationView({
     prefetchNarration(docId, ahead, voiceId).catch(() => {})
   }, [audio.state.idx, manifest, docId, voiceId])
 
-  // -------- explicit Resume Narration (banner) --------
-  const handleResume = useCallback(() => {
-    clearInterruption?.()
-    audio.play()
-  }, [audio, clearInterruption])
-
   const onChunkClick = useCallback((idx) => {
     audio.seekChapter(idx, 0)
     audio.play()
@@ -140,38 +124,6 @@ export default function NarrationView({
 
   return (
     <div className="flex h-full flex-col">
-      <AnimatePresence>
-        {warn && (
-          <motion.div
-            initial={{ opacity: 0, y: -4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            className="mx-auto mt-2 max-w-3xl rounded-sm border border-rule bg-elevated px-3 py-1.5 text-[0.78rem] text-ink-muted"
-          >
-            {warn}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {interruption && (
-          <motion.div
-            initial={{ opacity: 0, y: -4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            className="mx-auto mt-2 flex max-w-3xl items-center justify-between gap-3 rounded-sm border border-rule bg-elevated px-3 py-1.5 text-[0.78rem] text-ink-muted"
-          >
-            <span>{interruption.message || 'Reading paused.'}</span>
-            <button
-              onClick={handleResume}
-              className="text-[0.78rem] text-accent transition-colors hover:text-accent-deep"
-            >
-              Resume →
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* Reading column — single max-w, no glass card. */}
       <div className="mx-auto flex w-full max-w-[760px] flex-1 flex-col overflow-hidden px-6 pt-6">
         <div className="min-h-0 flex-1 overflow-y-auto">

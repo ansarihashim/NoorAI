@@ -11,15 +11,12 @@ services:
     rootDir: backend
     # The build command:
     #   1. Installs pinned dependencies.
-    #   2. Pre-downloads the Whisper model and the SentenceTransformer
-    #      embedding model so the first request doesn't pay a cold-start
-    #      fetch tax.
-    #   3. Runs Alembic against the configured DATABASE_URL so schema is
+    #   2. Runs Alembic against the configured DATABASE_URL so schema is
     #      always in sync with the code that's about to start.
+    # Both embeddings (HF Inference API) and the vector store (Pinecone)
+    # are hosted services — there is no local ML model to pre-download.
     buildCommand: |
       pip install --no-cache-dir -r requirements.txt
-      python -m app.scripts.download_whisper
-      python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')"
       alembic -c alembic.ini upgrade head
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /healthz
@@ -32,13 +29,6 @@ services:
         value: prod
       - key: STORAGE_DIR
         value: /tmp/storage
-      # Whisper sized for 512 MB RAM tier. Bump to base.en on Render Standard.
-      - key: WHISPER_MODEL
-        value: tiny.en
-      - key: WHISPER_DEVICE
-        value: cpu
-      - key: WHISPER_COMPUTE_TYPE
-        value: int8
 
       # --- Secrets / per-environment values (set in the Render dashboard) ---
       - key: GROQ_API_KEY
@@ -51,8 +41,16 @@ services:
         sync: false
       - key: ELEVENLABS_API_KEY
         sync: false              # leave blank to use free Edge-TTS
-      - key: GOOGLE_APPLICATION_CREDENTIALS
-        sync: false              # leave blank to use free Edge-TTS
+      - key: HUGGINGFACE_API_TOKEN
+        sync: false              # required — embeddings run on HF Inference API
+      - key: PINECONE_API_KEY
+        sync: false              # required — vector store is Pinecone serverless
+      - key: PINECONE_INDEX_NAME
+        value: noorai-rag
+      - key: PINECONE_CLOUD
+        value: aws
+      - key: PINECONE_REGION
+        value: us-east-1
 
       # --- Auth ---
       - key: JWT_SECRET

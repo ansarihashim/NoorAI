@@ -39,12 +39,12 @@ def _build_csp(*, dev: bool, frontend_origins: list[str]) -> str:
     """Compose the Content-Security-Policy string.
 
     `connect-src` must include every host the SPA talks to — the API itself
-    (same-origin), Groq, ElevenLabs, and Google APIs (the optional fallback
-    TTS path). For dev we also allow ws://localhost:5173 so Vite HMR works.
+    (same-origin), Groq, and ElevenLabs. For dev we also allow
+    ws://localhost:5173 so Vite HMR works.
     """
     self_ = "'self'"
     api_origins = " ".join(frontend_origins)
-    extra_connect = " https://api.groq.com https://api.elevenlabs.io https://texttospeech.googleapis.com"
+    extra_connect = " https://api.groq.com https://api.elevenlabs.io"
     if dev:
         # Vite HMR: wss + eval. We accept these only in dev mode.
         script_src  = f"{self_} 'unsafe-eval'"

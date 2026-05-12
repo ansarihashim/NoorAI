@@ -1,29 +1,32 @@
-"""Bidirectional WebSocket: /ws/audio.
+"""Server-push WebSocket: /ws/audio.
 
 Auth: token must be passed as `?token=<JWT>` in the query string. The browser
 WebSocket API cannot set custom headers, so query-string auth is pragmatic.
 Connections without a valid token are closed with code 1008 (policy violation).
 
+Direction:
+  The voice barge-in feature was removed — the socket is now server-push only.
+  Inbound mic audio (binary frames) is no longer handled at all; clients that
+  send binary frames have them dropped silently.
+
 Wire format:
   Inbound JSON (text frames):
     {"type": "start_narration", "doc_id": "..."}
-    {"type": "start_podcast", "doc_id": "..."}
+    {"type": "start_podcast",   "doc_id": "..."}
     {"type": "stop"}
     {"type": "resume"}
     {"type": "ping"}
-  Inbound binary frames: int16 LE PCM, 16kHz mono, any chunk size.
 
   Outbound JSON:
     {"type": "ready"}
     {"type": "pong"}
-    {"type": "state", "value": "narrating|interrupted|thinking|speaking|idle|podcast_generating|podcast_playing", "cursor": int}
-    {"type": "transcript", "role": "user|narrator|assistant", "text": "...", "chunk_idx"?: int}
+    {"type": "state", "value": "narrating|idle|podcast_generating|podcast_playing", "cursor": int}
+    {"type": "transcript", "role": "narrator", "text": "...", "chunk_idx"?: int}
     {"type": "narration_cursor", "chunk_idx": int}
     {"type": "narration_done"}
     {"type": "podcast_ready", "doc_id": str, "title": str, "n_turns": int, "turns": [{speaker,text}]}
     {"type": "podcast_turn", "turn_idx": int, "speaker": "host|guest", "text": "..."}
     {"type": "podcast_done"}
-    {"type": "flush_audio"}                  # client should drop its playback queue
     {"type": "error", "message": "..."}
   Outbound binary frames: MP3 audio chunks for playback.
 """
@@ -46,12 +49,6 @@ from app.utils.security_input import validate_doc_id
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-
-# Hard upper bound on a single binary frame. Real audio frames from the
-# AudioWorklet are int16 LE 16 kHz mono — at 16 kbps × 2 bytes = 32 KB/sec,
-# the largest reasonable frame is well under this. Anything larger is a
-# misuse / abuse; drop it and continue.
-_MAX_BINARY_FRAME_BYTES = 64 * 1024
 
 # Hard upper bound on an inbound text frame. Real protocol messages are
 # ~80 bytes; this is generous slack for pathological JSON.
@@ -86,8 +83,6 @@ async def ws_audio(ws: WebSocket) -> None:
     client = f"{ws.client.host}:{ws.client.port}" if ws.client else "?"
     started = time.monotonic()
     text_msgs = 0
-    bytes_frames = 0
-    bytes_total = 0
 
     logger.info("ws[%s] connect from %s", conn_id, client)
 
@@ -165,17 +160,11 @@ async def ws_audio(ws: WebSocket) -> None:
                 await ws.close(code=status.WS_1008_POLICY_VIOLATION)
                 break
 
+            # Binary frames are no longer part of the protocol — voice
+            # barge-in was removed when Whisper was dropped. Silently
+            # ignore any binary payloads from misbehaving / outdated
+            # clients rather than closing the socket.
             if "bytes" in msg and msg["bytes"] is not None:
-                payload = msg["bytes"]
-                # Cap binary frames. Anything larger than _MAX_BINARY_FRAME_BYTES
-                # is dropped silently (the AudioWorklet never produces frames
-                # this large in normal operation).
-                if len(payload) > _MAX_BINARY_FRAME_BYTES:
-                    logger.warning("ws[%s] dropping oversized binary frame %d bytes", conn_id, len(payload))
-                    continue
-                bytes_frames += 1
-                bytes_total += len(payload)
-                session.feed_audio(payload)
                 continue
 
             if "text" in msg and msg["text"] is not None:
@@ -216,20 +205,9 @@ async def ws_audio(ws: WebSocket) -> None:
                         continue
                     try:
                         await session.start_narration(doc_id)
-                    except Exception as exc:
+                    except Exception:
                         logger.exception("ws[%s] start_narration failed", conn_id)
                         await send_json({"type": "error", "message": "start_narration failed"})
-                        _ = exc  # the detail goes to the log, not the client
-                elif kind == "start_attend":
-                    doc_id = _check_doc(obj.get("doc_id"))
-                    if not doc_id:
-                        await send_json({"type": "error", "message": "invalid doc_id"})
-                        continue
-                    try:
-                        await session.start_attend(doc_id)
-                    except Exception:
-                        logger.exception("ws[%s] start_attend failed", conn_id)
-                        await send_json({"type": "error", "message": "start_attend failed"})
                 elif kind == "start_podcast":
                     doc_id = _check_doc(obj.get("doc_id"))
                     if not doc_id:
@@ -269,6 +247,6 @@ async def ws_audio(ws: WebSocket) -> None:
 
         elapsed = time.monotonic() - started
         logger.info(
-            "ws[%s] closed after %.2fs user=%s text_msgs=%d audio_frames=%d audio_bytes=%d",
-            conn_id, elapsed, user_id, text_msgs, bytes_frames, bytes_total,
+            "ws[%s] closed after %.2fs user=%s text_msgs=%d",
+            conn_id, elapsed, user_id, text_msgs,
         )

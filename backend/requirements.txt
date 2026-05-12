@@ -5,21 +5,21 @@ pydantic==2.10.3
 pydantic-settings==2.6.1
 python-multipart==0.0.18
 
-# STT
-faster-whisper==1.1.0
-webrtcvad-wheels==2.0.14
+# numpy is used by the RAG service to shape HF embeddings into a 2-D
+# float32 array before upserting to Pinecone. STT (Whisper) and VAD have
+# been removed from the product — voice barge-in is no longer supported.
 numpy==1.26.4
-soundfile==0.12.1
 
-# RAG
-sentence-transformers==3.3.1
-faiss-cpu==1.9.0.post1
+# RAG — embeddings via HuggingFace Inference API, vectors in Pinecone
+# serverless (see app/rag/service.py). No local sentence-transformers / FAISS
+# — saves ~500 MB RAM on the free dyno and removes the FAISS-on-disk +
+# Postgres-mirror hydration dance.
+pinecone==5.4.2
 pypdf==5.1.0
 
 # LLM + TTS
 groq==0.13.0
 elevenlabs==1.50.3
-google-cloud-texttospeech==2.21.1
 edge-tts==7.2.8
 
 # DB

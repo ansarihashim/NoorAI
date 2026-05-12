@@ -10,9 +10,9 @@ import { usePodcastSession } from '../workspace/PodcastSessionContext.jsx'
  * a thin "now playing" line, and the player. The transcript is hosted in
  * the right rail (NotebookLM-style).
  *
- * The Ask-a-Doubt voice loop was removed: podcast is now a one-way listen
- * experience. The session-level WebSocket props are still received from
- * <Session/> for backwards compatibility but the mic is not opened.
+ * One-way listen experience. The session-level WebSocket props are still
+ * received from <Session/> for backwards compatibility; this component
+ * does not currently consume them.
  *
  * Props (from <Session/>):
  *   docId — only used to dedupe action handling
@@ -21,7 +21,7 @@ export default function PodcastPlayback({
   // eslint-disable-next-line no-unused-vars
   docId,
   // eslint-disable-next-line no-unused-vars
-  serverState, wsStatus, sendJson, sendBytes, messages = [],
+  serverState, wsStatus, sendJson,
 }) {
   const { turns, status, errorMsg, busy, chapters, audio, generate, seekTurn } = usePodcastSession()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -84,7 +84,6 @@ export default function PodcastPlayback({
   const currentSpeaker = turns?.[audio.state.idx]?.speaker
   const hostActive = audio.state.playing && currentSpeaker === 'host'
   const guestActive = audio.state.playing && currentSpeaker === 'guest'
-  const lastQA = messages.length > 0 ? messages[messages.length - 1] : null
 
   return (
     <div className="flex h-full flex-col">

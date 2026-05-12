@@ -27,16 +27,24 @@ class Settings(BaseSettings):
     elevenlabs_model: str = "eleven_turbo_v2_5"
 
     # TTS — fallback
-    google_application_credentials: str = ""
-    google_tts_api_key: str = ""
-
     # DB
     database_url: str = "postgresql+asyncpg://user:pass@localhost/echoverse"
 
-    # Whisper
-    whisper_model: str = "base.en"
-    whisper_device: str = "cpu"
-    whisper_compute_type: str = "int8"
+    # Embeddings — HuggingFace Inference API (replaces local sentence-transformers).
+    # Free token: https://huggingface.co/settings/tokens
+    huggingface_api_token: str = ""
+    huggingface_embed_model: str = "sentence-transformers/all-MiniLM-L6-v2"
+
+    # Vector store — Pinecone serverless (replaces local FAISS).
+    # Free key: https://app.pinecone.io
+    # One index, namespaced per doc_id. Index is auto-created on first use
+    # with dimension=384 (matching the default embedding model) and cosine
+    # metric. If you change the embedding model's dimension, delete the
+    # Pinecone index from the dashboard so it gets recreated correctly.
+    pinecone_api_key: str = ""
+    pinecone_index_name: str = "noorai-rag"
+    pinecone_cloud: str = "aws"
+    pinecone_region: str = "us-east-1"
 
     # App
     app_env: str = "dev"
