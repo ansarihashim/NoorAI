@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { speak as demoSpeak, stop as demoStop } from '../lib/demoTts.js'
 
 /**
  * Chapter-aware HTML5 <audio> controller.
@@ -18,11 +19,19 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
  *                   localDuration, globalTime, globalDuration, rate, volume,
  *                   muted, error }
  *
- * Chapter shape: { idx, url, label?, durationHint? }
+ * Chapter shape: { idx, url, label?, durationHint?, text?, role? }
  *   - durationHint (seconds) is used in the global timeline before the audio
  *     element loads metadata. Once `loadedmetadata` fires, the hook caches
  *     the real duration internally.
+ *   - text / role are used in DEMO MODE only: when `url` starts with
+ *     `demo://`, the hook plays audio via the browser's Web Speech API
+ *     (lib/demoTts.js) and simulates the timeline locally. Production
+ *     deployments never pass a `demo://` URL so this branch is dead code
+ *     when the real backend is in use.
  */
+
+/** True iff a chapter URL signals demo-mode (Web Speech) playback. */
+function isDemoUrl(u) { return typeof u === 'string' && u.startsWith('demo://') }
 export function useAudio({ chapters = [], onChapterChange, onEnded } = {}) {
   const audioRef = useRef(null)
   const chaptersRef = useRef(chapters)
@@ -33,6 +42,22 @@ export function useAudio({ chapters = [], onChapterChange, onEnded } = {}) {
   const pendingRef = useRef(null)
   // user-intended playing state — we honor this across chapter switches
   const wantsPlayingRef = useRef(false)
+
+  // --- demo-mode (Web Speech) bookkeeping -------------------------------
+  // The current generation id for demo playback. Each time we start a new
+  // chapter (or stop), we bump this; the resolve callback of the previous
+  // speak() compares its captured id against the current one before doing
+  // anything, so a stale completion can't auto-advance after a stop/seek.
+  const demoGenRef = useRef(0)
+  // setInterval id for the simulated timeupdate clock.
+  const demoTickRef = useRef(null)
+  // Monotonic clock anchor — when playback started (ms since epoch).
+  const demoStartedAtRef = useRef(0)
+  // Accumulated elapsed seconds across pauses for the active chapter.
+  const demoElapsedRef = useRef(0)
+  // Cache of the chapter we're currently speaking, so play() after a pause
+  // knows what to resume.
+  const demoChapterRef = useRef(null)
 
   const [idx, setIdx] = useState(-1)
   const [localTime, setLocalTime] = useState(0)
@@ -136,8 +161,106 @@ export function useAudio({ chapters = [], onChapterChange, onEnded } = {}) {
       a.removeEventListener('volumechange', onVolume)
       try { a.pause() } catch {}
       a.src = ''
+      // Cancel any in-flight Web Speech utterance and clear the tick.
+      try { demoStop() } catch { /* no-op */ }
+      if (demoTickRef.current != null) {
+        clearInterval(demoTickRef.current)
+        demoTickRef.current = null
+      }
     }
   }, [])
+
+  // ---- demo-mode helpers (Web Speech path) ----
+  const stopDemoTick = useCallback(() => {
+    if (demoTickRef.current != null) {
+      clearInterval(demoTickRef.current)
+      demoTickRef.current = null
+    }
+  }, [])
+
+  const cancelDemo = useCallback(() => {
+    demoGenRef.current += 1
+    stopDemoTick()
+    try { demoStop() } catch { /* no-op */ }
+    demoElapsedRef.current = 0
+    demoStartedAtRef.current = 0
+    demoChapterRef.current = null
+  }, [stopDemoTick])
+
+  const startDemoSpeech = useCallback((ch, estDur, startOffset = 0) => {
+    const gen = ++demoGenRef.current
+    demoChapterRef.current = ch
+    demoElapsedRef.current = startOffset
+    demoStartedAtRef.current = Date.now()
+    setPaused(false)
+    setEnded(false)
+    wantsPlayingRef.current = true
+
+    // Drive the timeline at 4 Hz so the player's progress bar moves.
+    stopDemoTick()
+    demoTickRef.current = setInterval(() => {
+      const elapsed = demoElapsedRef.current + (Date.now() - demoStartedAtRef.current) / 1000
+      setLocalTime(Math.min(elapsed, estDur))
+    }, 250)
+
+    demoSpeak(ch.text || '', { role: ch.role || 'narrator' }).then(() => {
+      // If a stop / new chapter happened mid-speech, ignore this completion.
+      if (gen !== demoGenRef.current) return
+      stopDemoTick()
+      setLocalTime(estDur)
+      setPaused(true)
+      setEnded(true)
+      // Auto-advance to the next chapter when the user was actively playing.
+      const list = chaptersRef.current
+      const next = list.find((c) => c.idx === ch.idx + 1)
+      if (next && wantsPlayingRef.current) {
+        // Recurse into the demo loader for the next chapter.
+        // eslint-disable-next-line @typescript-eslint/no-use-before-define
+        loadDemoChapter(next, { play: true })
+      } else {
+        wantsPlayingRef.current = false
+        cbRef.current.onEnded?.()
+      }
+    })
+  }, [stopDemoTick])
+
+  const loadDemoChapter = useCallback((ch, opts = {}) => {
+    // Make sure the real <audio> element isn't fighting us.
+    const a = audioRef.current
+    try {
+      if (a) {
+        a.pause()
+        a.removeAttribute('src')
+        a.load()
+      }
+    } catch { /* no-op */ }
+    cancelDemo()
+
+    const text = ch.text || ''
+    // Web Speech rate ≈ 14 chars/sec at default settings — close enough for
+    // a believable progress bar. Floor at 4 s so short turns don't snap.
+    const estDur = Math.max(4, Math.round(text.length / 14))
+
+    setReady(false)
+    setError(null)
+    setEnded(false)
+    setIdx(ch.idx)
+    setLocalTime(0)
+    setLocalDuration(estDur)
+    durationsRef.current.set(ch.idx, estDur)
+    setDurationsTick((n) => n + 1)
+    setReady(true)
+    cbRef.current.onChapterChange?.(ch.idx)
+
+    const shouldPlay = opts.play ?? wantsPlayingRef.current
+    if (shouldPlay && text) {
+      startDemoSpeech(ch, estDur, opts.localTime || 0)
+    } else {
+      setPaused(true)
+      demoChapterRef.current = ch
+    }
+    return true
+  }, [cancelDemo, startDemoSpeech])
 
   // ---- chapter loader ----
   const loadChapter = useCallback((targetIdx, opts = {}) => {
@@ -145,6 +268,12 @@ export function useAudio({ chapters = [], onChapterChange, onEnded } = {}) {
     const list = chaptersRef.current
     const ch = list.find((c) => c.idx === targetIdx)
     if (!a || !ch) return false
+    // Demo branch: handled entirely by Web Speech, ignores the <audio> element.
+    if (isDemoUrl(ch.url)) {
+      return loadDemoChapter(ch, opts)
+    }
+    // Real-backend branch: cancel any in-flight demo first (mode switch).
+    cancelDemo()
     setReady(false)
     setError(null)
     setEnded(false)
@@ -160,26 +289,68 @@ export function useAudio({ chapters = [], onChapterChange, onEnded } = {}) {
     try { a.load() } catch {}
     cbRef.current.onChapterChange?.(ch.idx)
     return true
-  }, [])
+  }, [cancelDemo, loadDemoChapter])
 
   // ---- public actions ----
   const play = useCallback(() => {
-    const a = audioRef.current
     wantsPlayingRef.current = true
-    if (!a) return
+    // If no chapter is loaded yet, kick off the first one.
     if (idx < 0 && chaptersRef.current.length > 0) {
       loadChapter(chaptersRef.current[0].idx, { play: true })
       return
     }
+    // Demo branch: resume Web Speech if it's a demo chapter.
+    const curCh = chaptersRef.current.find((c) => c.idx === idx)
+    if (curCh && isDemoUrl(curCh.url)) {
+      // Already speaking? speechSynthesis.paused tells us so.
+      if (typeof window !== 'undefined' && window.speechSynthesis?.paused) {
+        try { window.speechSynthesis.resume() } catch { /* no-op */ }
+        demoStartedAtRef.current = Date.now()
+        setPaused(false)
+        // Restart the tick if it was cleared.
+        if (demoTickRef.current == null) {
+          const estDur = durationsRef.current.get(idx) || 0
+          demoTickRef.current = setInterval(() => {
+            const elapsed = demoElapsedRef.current + (Date.now() - demoStartedAtRef.current) / 1000
+            setLocalTime(Math.min(elapsed, estDur))
+          }, 250)
+        }
+        return
+      }
+      // Fresh start (e.g. after seek to the same chapter).
+      const ch = demoChapterRef.current || curCh
+      const estDur = durationsRef.current.get(ch.idx) || Math.max(4, (ch.text || '').length / 14)
+      startDemoSpeech(ch, estDur, localTime || 0)
+      return
+    }
+    // Real-backend branch.
+    const a = audioRef.current
+    if (!a) return
     a.play().catch(() => {})
-  }, [idx, loadChapter])
+  }, [idx, localTime, loadChapter, startDemoSpeech])
 
   const pause = useCallback(() => {
-    const a = audioRef.current
     wantsPlayingRef.current = false
+    // Demo branch: pause Web Speech and accumulate elapsed time.
+    const curCh = chaptersRef.current.find((c) => c.idx === idx)
+    if (curCh && isDemoUrl(curCh.url)) {
+      if (typeof window !== 'undefined' && window.speechSynthesis) {
+        try {
+          if (window.speechSynthesis.speaking && !window.speechSynthesis.paused) {
+            window.speechSynthesis.pause()
+          }
+        } catch { /* no-op */ }
+      }
+      demoElapsedRef.current = demoElapsedRef.current + (Date.now() - demoStartedAtRef.current) / 1000
+      stopDemoTick()
+      setPaused(true)
+      return
+    }
+    // Real-backend branch.
+    const a = audioRef.current
     if (!a) return
     try { a.pause() } catch {}
-  }, [])
+  }, [idx, stopDemoTick])
 
   const toggle = useCallback(() => {
     if (paused || ended) play()
@@ -284,6 +455,7 @@ export function useAudio({ chapters = [], onChapterChange, onEnded } = {}) {
 
   const stop = useCallback(() => {
     pause()
+    cancelDemo()
     setIdx(-1)
     setLocalTime(0)
     setLocalDuration(0)
@@ -295,7 +467,7 @@ export function useAudio({ chapters = [], onChapterChange, onEnded } = {}) {
       a.removeAttribute('src')
       try { a.load() } catch {}
     }
-  }, [pause])
+  }, [pause, cancelDemo])
 
   // ---- derived state ----
   const { globalDuration, globalTime } = useMemo(() => {

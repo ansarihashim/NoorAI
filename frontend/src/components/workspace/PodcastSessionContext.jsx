@@ -88,6 +88,10 @@ export function PodcastSessionProvider({ children }) {
         speaker: t.speaker,
         label: t.speaker === 'guest' ? 'Guest' : 'Host',
         durationHint: estimateTurnDuration(t.text),
+        // Carried for demo-mode Web Speech playback (useAudio detects the
+        // `demo://` URL scheme and reads `text` instead of the audio file).
+        text: t.text,
+        role: t.speaker,
       })),
     [turns, docId],
   )

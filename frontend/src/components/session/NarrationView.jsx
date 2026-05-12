@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useSearchParams } from 'react-router-dom'
 import { useAudio } from '../../hooks/useAudio.js'
@@ -67,6 +67,10 @@ export default function NarrationView({
       url: narrationChunkUrl(docId, c.idx, voiceId),
       label: `¶ ${c.idx + 1}`,
       durationHint: estimateChunkDuration(c.text),
+      // Carried for demo-mode Web Speech playback (useAudio detects the
+      // `demo://` URL scheme and reads `text` instead of the audio file).
+      text: c.text,
+      role: 'narrator',
     }))
   }, [manifest, docId, voiceId])
 
