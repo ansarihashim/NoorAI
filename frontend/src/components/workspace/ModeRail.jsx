@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion'
 import { useWorkspace } from './WorkspaceContext.jsx'
+import { useSound } from '../../lib/sound.jsx'
 
 /**
  * Slim in-center rail that lets the user switch cognitive mode without
@@ -18,6 +19,7 @@ const MODES = [
 
 export default function ModeRail() {
   const { activeMode, setActiveMode } = useWorkspace()
+  const { play } = useSound()
   return (
     <nav className="flex items-center gap-6 border-b border-rule px-5 py-2">
       {MODES.map((m) => {
@@ -26,7 +28,10 @@ export default function ModeRail() {
         return (
           <button
             key={m.id}
-            onClick={() => setActiveMode(m.id)}
+            onClick={() => {
+              if (m.id !== activeMode) play('page')
+              setActiveMode(m.id)
+            }}
             className="relative flex items-center gap-2 py-1.5 text-[0.875rem] font-medium transition-colors"
           >
             <Glyph active={active} />

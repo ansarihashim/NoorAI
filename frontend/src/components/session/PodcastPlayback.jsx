@@ -1,35 +1,41 @@
 import { motion } from 'framer-motion'
 import { useSearchParams } from 'react-router-dom'
-import { useEffect } from 'react'
-import Skeleton from '../ui/Skeleton.jsx'
+import { useCallback, useEffect } from 'react'
 import PremiumPlayer from '../player/PremiumPlayer.jsx'
+import GenerationProgress, { PODCAST_STAGES } from '../ui/GenerationProgress.jsx'
 import { usePodcastSession } from '../workspace/PodcastSessionContext.jsx'
 
 /**
  * Center playback surface for Podcast mode. Calm — two small avatars,
- * a thin "now playing" line, the player, and an explicit Ask Doubt
- * button. The transcript is hosted in the right rail (NotebookLM-style).
+ * a thin "now playing" line, and the player. The transcript is hosted in
+ * the right rail (NotebookLM-style).
  *
- * Reacts to AI Studio actions via ?action= search param:
- *   ?action=generate-podcast | regenerate-podcast → trigger generation
- *   ?action=ask-doubt                              → arm Ask Doubt
+ * The Ask-a-Doubt voice loop was removed: podcast is now a one-way listen
+ * experience. The session-level WebSocket props are still received from
+ * <Session/> for backwards compatibility but the mic is not opened.
+ *
+ * Props (from <Session/>):
+ *   docId — only used to dedupe action handling
  */
-export default function PodcastPlayback() {
+export default function PodcastPlayback({
+  // eslint-disable-next-line no-unused-vars
+  docId,
+  // eslint-disable-next-line no-unused-vars
+  serverState, wsStatus, sendJson, sendBytes, messages = [],
+}) {
   const { turns, status, errorMsg, busy, chapters, audio, generate, seekTurn } = usePodcastSession()
   const [searchParams, setSearchParams] = useSearchParams()
   const action = searchParams.get('action')
 
+  // Consume AI-Studio "?action=..." pings — only generate / regenerate now.
   useEffect(() => {
     if (!action) return
     if (action === 'generate-podcast' || action === 'regenerate-podcast') {
       generate()
     }
-    // Clear action so it's not re-fired on re-render. Ask Doubt is consumed below.
-    if (action !== 'ask-doubt') {
-      const next = new URLSearchParams(searchParams)
-      next.delete('action'); next.delete('action_at')
-      setSearchParams(next, { replace: true })
-    }
+    const next = new URLSearchParams(searchParams)
+    next.delete('action'); next.delete('action_at')
+    setSearchParams(next, { replace: true })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [action, searchParams.get('action_at')])
 
@@ -51,10 +57,12 @@ export default function PodcastPlayback() {
               : 'Two voices riff on this source — useful for a passive listen or a different angle on the material.'}
           </p>
           {status === 'generating' ? (
-            <div className="mx-auto mt-6 max-w-xs space-y-2">
-              <Skeleton className="h-2 w-full rounded-full" />
-              <Skeleton className="h-2 w-3/4 rounded-full" />
-              <Skeleton className="h-2 w-5/6 rounded-full" />
+            <div className="mt-6">
+              <GenerationProgress
+                active
+                stages={PODCAST_STAGES}
+                overrunLabel="Finalising — almost there"
+              />
             </div>
           ) : (
             <button
@@ -76,16 +84,17 @@ export default function PodcastPlayback() {
   const currentSpeaker = turns?.[audio.state.idx]?.speaker
   const hostActive = audio.state.playing && currentSpeaker === 'host'
   const guestActive = audio.state.playing && currentSpeaker === 'guest'
+  const lastQA = messages.length > 0 ? messages[messages.length - 1] : null
 
   return (
     <div className="flex h-full flex-col">
       {/* Speakers — calm pair indicator */}
       <div className="flex items-center justify-center gap-12 px-6 pb-6 pt-12">
-        <SpeakerCard role="host" name="Claude (host)" active={hostActive} />
+        <SpeakerCard role="host" name="Host" active={hostActive} />
         <SpeakerCard role="guest" name="Co-host" active={guestActive} />
       </div>
 
-      {/* Player + ask doubt */}
+      {/* Player */}
       <div className="mx-auto w-full max-w-2xl px-4 pb-6 sm:px-6">
         <PremiumPlayer
           audio={audio}
@@ -98,7 +107,6 @@ export default function PodcastPlayback() {
           }
           onChapterClick={seekTurn}
         />
-        <AskDoubtButton />
       </div>
     </div>
   )
@@ -159,57 +167,6 @@ function SpeakerCard({ role, name, active }) {
           {active ? 'speaking' : 'standing by'}
         </div>
       </div>
-    </div>
-  )
-}
-
-/* ---------- Manual Ask Doubt button (frontend stub for now) ---------- */
-
-function AskDoubtButton() {
-  const { audio } = usePodcastSession()
-  const [searchParams, setSearchParams] = useSearchParams()
-  const armed = searchParams.get('action') === 'ask-doubt'
-
-  function trigger() {
-    audio.pause()
-    const next = new URLSearchParams(searchParams)
-    next.set('action', 'ask-doubt')
-    next.set('action_at', String(Date.now()))
-    setSearchParams(next, { replace: true })
-  }
-
-  function dismiss() {
-    audio.play()
-    const next = new URLSearchParams(searchParams)
-    next.delete('action'); next.delete('action_at')
-    setSearchParams(next, { replace: true })
-  }
-
-  return (
-    <div className="mt-3 flex items-center justify-center">
-      {!armed ? (
-        <button
-          onClick={trigger}
-          className="inline-flex items-center gap-2 rounded-md border border-rule bg-elevated px-4 py-2 text-[0.8125rem] text-ink-muted transition-colors hover:bg-float hover:text-ink"
-        >
-          <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 1v3M12 20v3M4 12H1M23 12h-3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1" />
-            <circle cx="12" cy="12" r="4" />
-          </svg>
-          Ask a doubt
-        </button>
-      ) : (
-        <div className="inline-flex items-center gap-3 rounded-md border border-accent bg-accent-soft px-3 py-2">
-          <span className="live-dot" />
-          <span className="text-[0.8125rem] text-ink">Listening… (mic loop coming next pass)</span>
-          <button
-            onClick={dismiss}
-            className="text-[0.75rem] text-ink-dim transition-colors hover:text-ink"
-          >
-            Cancel · resume
-          </button>
-        </div>
-      )}
     </div>
   )
 }

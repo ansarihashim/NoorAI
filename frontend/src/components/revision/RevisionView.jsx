@@ -7,7 +7,6 @@ import ActiveRecallView from './ActiveRecallView.jsx'
 import QuickRevisionView from './QuickRevisionView.jsx'
 import NightBeforeView from './NightBeforeView.jsx'
 import VivaView from './VivaView.jsx'
-import VisualRevisionView from './VisualRevisionView.jsx'
 
 const SUB_TABS = [
   { value: 'flashcards', label: 'Flashcards',     hint: 'Tap to flip · ←/→ to move' },
@@ -15,7 +14,6 @@ const SUB_TABS = [
   { value: 'recall',     label: 'Active Recall',  hint: 'Think first · then reveal' },
   { value: 'quick',      label: 'Quick Revision', hint: 'TL;DR for fast passes' },
   { value: 'night',      label: 'Night Before',   hint: 'High-yield essentials' },
-  { value: 'visual',     label: 'Visual',         hint: 'Concept maps · diagrams' },
   { value: 'viva',       label: 'Viva',           hint: 'Spoken oral practice' },
 ]
 
@@ -27,8 +25,6 @@ const ACTION_TO_TAB = {
   'viva-prep':           { tab: 'viva',       generate: true  },
   'quick-revision':      { tab: 'quick',      generate: true  },
   'night-before':        { tab: 'night',      generate: true  },
-  'visual-summary':      { tab: 'visual',     generate: false },
-  'visual-flowchart':    { tab: 'visual',     generate: false },
 }
 
 export default function RevisionView({ docId }) {
@@ -56,7 +52,7 @@ export default function RevisionView({ docId }) {
   return (
     <div className="flex h-full flex-col">
       <div className="border-b border-rule px-5 py-2">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
           <div className="flex items-center gap-5 overflow-x-auto">
             {SUB_TABS.map((t) => {
               const active = tab === t.value
@@ -87,7 +83,7 @@ export default function RevisionView({ docId }) {
       </div>
 
       <div className="flex-1 overflow-auto">
-        <div className="mx-auto max-w-5xl px-4 py-7 sm:px-6 sm:py-9">
+        <div className="mx-auto max-w-7xl px-4 py-7 sm:px-6 sm:py-9">
           <AnimatePresence mode="wait">
             <motion.div
               key={tab}
@@ -101,7 +97,6 @@ export default function RevisionView({ docId }) {
               {tab === 'recall' && <ActiveRecallView docId={docId} action={actionSignal} />}
               {tab === 'quick' && <QuickRevisionView docId={docId} action={actionSignal} />}
               {tab === 'night' && <NightBeforeView docId={docId} action={actionSignal} />}
-              {tab === 'visual' && <VisualRevisionView docId={docId} action={actionSignal} />}
               {tab === 'viva' && <VivaView docId={docId} action={actionSignal} />}
             </motion.div>
           </AnimatePresence>

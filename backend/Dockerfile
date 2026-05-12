@@ -8,19 +8,25 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-COPY backend/requirements.txt ./backend/requirements.txt
-RUN pip install --no-cache-dir -r backend/requirements.txt
+# Install deps first so the layer is cached across code changes.
+COPY backend/requirements.txt ./requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
-COPY backend ./backend
+# Copy backend source. The repo holds the package at backend/app/ — we copy
+# it into /app/app so `uvicorn app.main:app` resolves cleanly.
+COPY backend/app       ./app
+COPY backend/alembic.ini ./alembic.ini
 
 # Pre-download Whisper + embedding models so first request isn't slow
-RUN python -m backend.scripts.download_whisper \
+RUN python -m app.scripts.download_whisper \
     && python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')"
 
-ENV PYTHONUNBUFFERED=1
-ENV STORAGE_DIR=/data/storage
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    STORAGE_DIR=/data/storage
+
 RUN mkdir -p /data/storage
 VOLUME ["/data/storage"]
 
 EXPOSE 8000
-CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

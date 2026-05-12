@@ -18,7 +18,15 @@ class PcmCaptureProcessor extends AudioWorkletProcessor {
     this.outIdx = 0
   }
 
-  process(inputs) {
+  process(inputs, outputs) {
+    // If we have an output channel (we do — main thread asks for 1 output so
+    // the audio graph pulls this node), write silence into it. Reading the
+    // worklet but not writing the output is what Chrome flags as underrun.
+    const out = outputs && outputs[0] && outputs[0][0]
+    if (out) {
+      for (let i = 0; i < out.length; i++) out[i] = 0
+    }
+
     const input = inputs[0]
     if (!input || input.length === 0) return true
     const channel = input[0]

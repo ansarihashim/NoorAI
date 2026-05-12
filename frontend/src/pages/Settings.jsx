@@ -3,10 +3,11 @@ import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useAuth } from '../lib/auth.jsx'
 import { useToast } from '../components/ui/Toast.jsx'
+import { useSound } from '../lib/sound.jsx'
 import Avatar from '../components/ui/Avatar.jsx'
 import Button from '../components/ui/Button.jsx'
-import Card from '../components/ui/Card.jsx'
 import VoicePicker from '../components/settings/VoicePicker.jsx'
+import { NotebookEyebrow } from '../components/ui/NotebookSurface.jsx'
 
 const PREFS_KEY = 'echoverse.prefs'
 
@@ -22,16 +23,22 @@ function savePrefs(p) {
   try { localStorage.setItem(PREFS_KEY, JSON.stringify(p)) } catch {}
 }
 
-function Section({ title, description, children }) {
+function Section({ idx, title, description, children }) {
   return (
     <section>
-      <div className="mb-3">
-        <h2 className="text-sm font-medium tracking-tight text-ink">{title}</h2>
-        {description && <p className="mt-0.5 text-xs text-ink-muted">{description}</p>}
+      <div className="mb-3 flex items-baseline gap-3">
+        <span className="font-mono text-[0.66rem] font-semibold tabular-nums tracking-[0.16em] text-ink-faint">
+          §{String(idx).padStart(2, '0')}
+        </span>
+        <div className="min-w-0">
+          <h2 className="font-serif text-[1.05rem] font-semibold tracking-tight text-ink">{title}</h2>
+          {description && <p className="mt-0.5 text-[0.82rem] text-ink-muted">{description}</p>}
+        </div>
+        <span aria-hidden className="ml-auto h-px flex-1 translate-y-[1px] bg-rule" />
       </div>
-      <Card className="p-0">
+      <div className="nb-card p-0">
         {children}
-      </Card>
+      </div>
     </section>
   )
 }
@@ -54,7 +61,7 @@ function Toggle({ checked, onChange, label }) {
       onClick={() => onChange(!checked)}
       className={[
         'relative inline-flex h-6 w-11 items-center rounded-pill border transition-colors',
-        checked ? 'border-accent-purple/40 bg-accent-purple/40' : 'border-white/[0.10] bg-white/[0.04]',
+        checked ? 'border-accent/50 bg-accent/30' : 'border-rule bg-white/[0.04]',
       ].join(' ')}
     >
       <motion.span
@@ -73,6 +80,7 @@ export default function Settings() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const toast = useToast()
+  const { play, muted, toggleMuted } = useSound()
   const [prefs, setPrefs] = useState(() => ({
     reducedMotion: false,
     autoStart: false,
@@ -86,32 +94,38 @@ export default function Settings() {
     setPrefs((p) => ({ ...p, ...patch }))
   }
 
-  function onSignOut() {
-    logout()
+  async function onSignOut() {
+    play('page')
+    try { await logout() } catch { /* no-op */ }
     toast.info('Signed out', 'See you soon.')
     navigate('/')
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-5 pb-24 pt-10 sm:px-8">
+    <div className="relative mx-auto max-w-2xl px-5 pb-24 pt-10 sm:px-8">
+      <span aria-hidden className="notebook-rule pointer-events-none absolute inset-0 -z-10" />
       <motion.div
         initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
       >
-        <span className="font-caption text-ink-muted">settings</span>
-        <h1 className="mt-2 font-display text-title text-ink">Make NoorAI yours.</h1>
-        <p className="mt-2 text-sm text-ink-muted">Preferences are saved on this device.</p>
+        <NotebookEyebrow accent>colophon · preferences</NotebookEyebrow>
+        <h1 className="mt-2 font-serif text-[clamp(1.7rem,3.2vw,2.2rem)] font-semibold leading-tight tracking-tight text-ink">
+          Make this notebook yours.
+        </h1>
+        <p className="mt-2 text-[0.92rem] text-ink-muted">
+          Preferences are saved on this device only — they don't sync.
+        </p>
       </motion.div>
 
       <div className="mt-10 space-y-8">
-        <Section title="Account" description="The address you signed in with.">
+        <Section idx={1} title="Account" description="The address bound to this notebook.">
           <Row>
             <div className="flex items-center gap-3">
               <Avatar name={user?.display_name} email={user?.email} size={40} />
               <div className="min-w-0">
-                <div className="truncate text-sm font-medium text-ink">{user?.display_name || 'You'}</div>
-                <div className="truncate text-xs text-ink-muted">{user?.email}</div>
+                <div className="truncate font-serif text-[0.95rem] font-medium text-ink">{user?.display_name || 'You'}</div>
+                <div className="truncate text-[0.78rem] text-ink-muted">{user?.email}</div>
               </div>
             </div>
             <Button variant="destructive" size="sm" onClick={onSignOut}>
@@ -121,17 +135,20 @@ export default function Settings() {
         </Section>
 
         <Section
+          idx={2}
           title="Voices"
           description="Pick the voices used for narration and the podcast host / guest. Press Hear it to sample."
         >
           <VoicePicker />
         </Section>
 
-        <Section title="Playback" description="How the player behaves on this device.">
+        <Section idx={3} title="Playback" description="How the player behaves on this device.">
           <Row last>
             <div>
-              <div className="text-sm font-medium text-ink">Default speed</div>
-              <div className="mt-0.5 text-xs text-ink-muted">Each session starts at this speed; tweak per-session in the player.</div>
+              <div className="font-serif text-[0.95rem] font-medium text-ink">Default speed</div>
+              <div className="mt-0.5 text-[0.78rem] text-ink-muted">
+                Each session starts at this speed; tweak per-session in the player.
+              </div>
             </div>
             <div className="flex items-center gap-3">
               <input
@@ -141,27 +158,40 @@ export default function Settings() {
                 step="0.05"
                 value={prefs.speed}
                 onChange={(e) => update({ speed: parseFloat(e.target.value) })}
-                className="w-32 accent-accent-purple"
+                className="w-32 accent-accent"
               />
-              <span className="font-mono text-xs text-ink-muted w-10 text-right">{prefs.speed.toFixed(2)}x</span>
+              <span className="w-10 text-right font-mono text-[0.78rem] tabular-nums text-ink-muted">
+                {prefs.speed.toFixed(2)}x
+              </span>
             </div>
           </Row>
         </Section>
 
-        <Section title="Accessibility" description="Honor your system preferences.">
+        <Section idx={4} title="Atmosphere" description="Subtle interface sounds and motion.">
+          <Row>
+            <div>
+              <div className="font-serif text-[0.95rem] font-medium text-ink">Notebook sounds</div>
+              <div className="mt-0.5 text-[0.78rem] text-ink-muted">
+                Soft taps and page-turns on key interactions. Off by default if you've muted.
+              </div>
+            </div>
+            <Toggle checked={!muted} onChange={() => toggleMuted()} label="notebook sounds" />
+          </Row>
           <Row last>
             <div>
-              <div className="text-sm font-medium text-ink">Reduce motion</div>
-              <div className="mt-0.5 text-xs text-ink-muted">Disable decorative animations across the app.</div>
+              <div className="font-serif text-[0.95rem] font-medium text-ink">Reduce motion</div>
+              <div className="mt-0.5 text-[0.78rem] text-ink-muted">
+                Disable decorative animations across the app.
+              </div>
             </div>
             <Toggle checked={prefs.reducedMotion} onChange={(v) => update({ reducedMotion: v })} label="reduce motion" />
           </Row>
         </Section>
 
-        <Section title="About" description="What you're running.">
+        <Section idx={5} title="About" description="What you're running.">
           <Row last>
-            <div className="text-xs text-ink-muted">NoorAI</div>
-            <div className="font-mono text-xs text-ink-faint">v0.1 · Phase 1+2+3</div>
+            <div className="font-serif text-[0.85rem] text-ink-muted">NoorAI</div>
+            <div className="font-mono text-[0.74rem] tabular-nums text-ink-faint">noor · v0.1</div>
           </Row>
         </Section>
       </div>

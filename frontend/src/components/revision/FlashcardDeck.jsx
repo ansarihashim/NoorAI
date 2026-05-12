@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
+import { useCitations } from '../../lib/citations.jsx'
 
 const DIFF_TONE = {
   easy: 'bg-accent-green/[0.10] text-accent-green border-accent-green/30',
@@ -20,6 +21,7 @@ const DIFF_TONE = {
  *   - Reduced-motion users get a static crossfade instead of the rotateY flip.
  */
 export default function FlashcardDeck({ cards, bookmarkKey, onChunkHover }) {
+  const citations = useCitations()
   const [idx, setIdx] = useState(0)
   const [flipped, setFlipped] = useState(false)
   const [bookmarks, setBookmarks] = useState(() => {
@@ -214,22 +216,22 @@ export default function FlashcardDeck({ cards, bookmarkKey, onChunkHover }) {
                     #{t}
                   </span>
                 ))}
-                {(card.grounded_chunks || []).map((cIdx) => (
+                {(card.grounded_chunks || []).length > 0 && (
                   <span
-                    key={`gc-${cIdx}`}
+                    key="gc-citation"
                     onMouseEnter={(e) => {
                       e.stopPropagation()
-                      onChunkHover?.(cIdx)
+                      onChunkHover?.(card.grounded_chunks[0])
                     }}
                     onMouseLeave={(e) => {
                       e.stopPropagation()
                       onChunkHover?.(null)
                     }}
-                    className="cursor-help rounded-pill border border-accent-purple/30 bg-accent-purple/[0.10] px-2 py-0.5 font-mono text-[0.65rem] text-accent-purple-soft"
+                    className="cursor-help rounded-pill border border-accent-purple/30 bg-accent-purple/[0.10] px-2 py-0.5 text-[0.65rem] text-accent-purple-soft"
                   >
-                    chunk #{cIdx}
+                    {citations.format(card.grounded_chunks)}
                   </span>
-                ))}
+                )}
               </div>
             </motion.div>
           </AnimatePresence>

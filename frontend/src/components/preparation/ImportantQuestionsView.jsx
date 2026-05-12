@@ -5,10 +5,12 @@ import {
   generateImportantQuestions,
   getImportantQuestions,
 } from '../../lib/api.js'
+import { useMultiDocCitations, format as formatCitation } from '../../lib/citations.jsx'
 import { useToast } from '../ui/Toast.jsx'
 import Button from '../ui/Button.jsx'
 import Dialog from '../ui/Dialog.jsx'
 import Skeleton from '../ui/Skeleton.jsx'
+import GenerationProgress, { QUESTIONS_STAGES } from '../ui/GenerationProgress.jsx'
 
 const N_OPTIONS = [8, 10, 15, 20]
 
@@ -21,6 +23,7 @@ const TYPE_TONE = {
 
 export default function ImportantQuestionsView({ docIds, action }) {
   const toast = useToast()
+  const citationsByDoc = useMultiDocCitations(docIds)
   const [set, setSet] = useState(null)
   const [busy, setBusy] = useState(false)
   const [n, setN] = useState(10)
@@ -182,15 +185,26 @@ export default function ImportantQuestionsView({ docIds, action }) {
                       {q.chunks && q.chunks.length > 0 && (
                         <div className="mt-3 flex flex-wrap items-center gap-1 text-[0.65rem] text-ink-faint">
                           <span>Grounded in:</span>
-                          {q.chunks.map((c, k) => (
-                            <span
-                              key={k}
-                              className="rounded-pill bg-white/[0.04] px-1.5 py-0.5 font-mono"
-                              title={c.doc_id}
-                            >
-                              {c.doc_id.slice(0, 6)}#{c.chunk_idx}
-                            </span>
-                          ))}
+                          {(() => {
+                            const byDoc = new Map()
+                            for (const c of q.chunks) {
+                              if (!byDoc.has(c.doc_id)) byDoc.set(c.doc_id, [])
+                              byDoc.get(c.doc_id).push(c.chunk_idx)
+                            }
+                            return [...byDoc.entries()].map(([docId, idxs]) => {
+                              const meta = citationsByDoc[docId] || { pages: [], is_paged: false, format: null }
+                              const label = meta.format ? meta.format(idxs) : formatCitation(meta.pages, meta.is_paged, idxs)
+                              return (
+                                <span
+                                  key={docId}
+                                  className="rounded-pill bg-white/[0.04] px-1.5 py-0.5"
+                                  title={docId}
+                                >
+                                  {label}
+                                </span>
+                              )
+                            })
+                          })()}
                         </div>
                       )}
                     </div>
@@ -266,17 +280,25 @@ function EmptyState({ n, onN, busy, onGenerate, nDocs }) {
           </svg>
         </div>
         <h3 className="mt-5 font-display text-xl font-semibold text-ink">
-          Predicted exam questions, grounded.
+          {busy ? `Writing ${n} predicted questions…` : 'Predicted exam questions, grounded.'}
         </h3>
-        <p className="mx-auto mt-2 max-w-sm text-pretty text-sm text-ink-muted">
-          {nDocs > 1
-            ? `Spans all ${nDocs} selected documents — every answer cites the chunks it drew from.`
-            : 'Every answer cites the chunks it drew from. Confidence calibrated by the model.'}
-        </p>
-        <div className="mt-6 inline-flex items-center gap-3">
-          <NPill value={n} onChange={onN} disabled={busy} />
-          <Button onClick={onGenerate} loading={busy} size="lg">Generate {n} questions</Button>
-        </div>
+        {!busy && (
+          <p className="mx-auto mt-2 max-w-sm text-pretty text-sm text-ink-muted">
+            {nDocs > 1
+              ? `Spans all ${nDocs} selected documents — every answer cites the chunks it drew from.`
+              : 'Every answer cites the chunks it drew from. Confidence calibrated by the model.'}
+          </p>
+        )}
+        {busy ? (
+          <div className="mt-6">
+            <GenerationProgress active stages={QUESTIONS_STAGES} />
+          </div>
+        ) : (
+          <div className="mt-6 inline-flex items-center gap-3">
+            <NPill value={n} onChange={onN} disabled={busy} />
+            <Button onClick={onGenerate} loading={busy} size="lg">Generate {n} questions</Button>
+          </div>
+        )}
       </div>
     </div>
   )

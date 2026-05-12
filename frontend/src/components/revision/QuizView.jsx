@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { deleteQuiz, generateQuiz, getQuiz } from '../../lib/api.js'
+import { useCitations } from '../../lib/citations.jsx'
 import { useToast } from '../ui/Toast.jsx'
 import Button from '../ui/Button.jsx'
 import Dialog from '../ui/Dialog.jsx'
@@ -16,6 +17,7 @@ const TYPE_LABEL = {
 
 export default function QuizView({ docId, action }) {
   const toast = useToast()
+  const citations = useCitations()
   const [quiz, setQuiz] = useState(null) // null=loading, undefined=none, QuizSet=loaded
   const [busy, setBusy] = useState(false)
   const [n, setN] = useState(12)
@@ -165,7 +167,7 @@ export default function QuizView({ docId, action }) {
             {TYPE_LABEL[q.type] || q.type}
           </span>
           <span className="font-mono text-[0.65rem] text-ink-faint">
-            {(q.grounded_chunks || []).map((c) => `#${c}`).join(' · ')}
+            {citations.format(q.grounded_chunks || [])}
           </span>
         </div>
         <p className="mt-4 text-pretty text-[1.05rem] leading-relaxed text-ink">{q.question}</p>

@@ -82,7 +82,7 @@ export default function ReadingPane({ chunks, currentIdx, totalChunks, state, ha
                     onChunkClick(idx)
                   }
                 } : undefined}
-                title={interactive ? `Jump to chunk ${idx + 1}` : undefined}
+                title={interactive ? `Jump to paragraph ${idx + 1}` : undefined}
                 className={[
                   'group relative rounded-md px-4 py-3 transition-colors duration-300',
                   interactive ? 'cursor-pointer' : '',

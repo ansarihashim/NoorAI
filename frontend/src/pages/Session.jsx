@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation, useParams } from 'react-router-dom'
 import { useWebSocket } from '../hooks/useWebSocket.js'
+import { useAudioPlayer } from '../hooks/useAudioPlayer.js'
 import { getDoc } from '../lib/api.js'
+import { CitationsProvider } from '../lib/citations.jsx'
 import { useToast } from '../components/ui/Toast.jsx'
 import { useWorkspace } from '../components/workspace/WorkspaceContext.jsx'
 import ModeRail from '../components/workspace/ModeRail.jsx'
@@ -113,10 +115,17 @@ export default function Session() {
     [toast],
   )
 
-  const onBytes = useCallback((buf) => {
-    const qa = window.__echoverse_qa_player
-    if (qa) qa.push(buf)
-  }, [])
+  // Shared streaming audio sink for Ask-a-Doubt replies. Lifted to Session so
+  // every mode (narration, podcast, …) plays Q&A audio through the same
+  // MediaSource — no need to register `window.__echoverse_qa_player` per mode.
+  const qaPlayer = useAudioPlayer()
+  const onBytes = useCallback((buf) => { qaPlayer.push(buf) }, [qaPlayer])
+
+  useEffect(() => {
+    function onFlush() { qaPlayer.flush() }
+    window.addEventListener('echoverse:flush_audio', onFlush)
+    return () => window.removeEventListener('echoverse:flush_audio', onFlush)
+  }, [qaPlayer])
 
   const { status: wsStatus, sendJson, sendBytes } = useWebSocket({ onJson, onBytes })
 
@@ -133,6 +142,7 @@ export default function Session() {
   )
 
   return (
+    <CitationsProvider docId={docId}>
     <div className="flex h-full flex-col">
       <ModeRail />
 
@@ -167,10 +177,18 @@ export default function Session() {
 
         {activeMode === 'podcast' && (
           <div className="h-full">
-            <PodcastPlayback />
+            <PodcastPlayback
+              docId={docId}
+              serverState={serverState}
+              wsStatus={wsStatus}
+              sendJson={sendJson}
+              sendBytes={sendBytes}
+              messages={messages}
+            />
           </div>
         )}
       </div>
     </div>
+    </CitationsProvider>
   )
 }

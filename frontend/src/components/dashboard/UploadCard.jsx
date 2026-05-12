@@ -5,6 +5,8 @@ import Button from '../ui/Button.jsx'
 import Input from '../ui/Input.jsx'
 import Tabs from '../ui/Tabs.jsx'
 import { useToast } from '../ui/Toast.jsx'
+import { useSound } from '../../lib/sound.jsx'
+import { NotebookEyebrow } from '../ui/NotebookSurface.jsx'
 
 const ACCEPT = '.txt,.md,.pdf'
 const ACCEPT_MIME = ['text/plain', 'text/markdown', 'application/pdf']
@@ -18,6 +20,7 @@ export default function UploadCard({ onUploaded }) {
   const [busy, setBusy] = useState(false)
   const fileRef = useRef(null)
   const toast = useToast()
+  const { play } = useSound()
 
   const onDrop = useCallback((e) => {
     e.preventDefault()
@@ -40,6 +43,7 @@ export default function UploadCard({ onUploaded }) {
   async function submit() {
     if (busy) return
     setBusy(true)
+    play('tap')
     try {
       const res =
         tab === 'paste'
@@ -57,22 +61,20 @@ export default function UploadCard({ onUploaded }) {
   const charCount = text.length
 
   return (
-    <div
-      className="group relative overflow-hidden rounded-xl border border-rule bg-elevated p-6 transition-colors duration-200 hover:border-rule-strong sm:p-8"
-    >
+    <div className="nb-page nb-page--margin group relative p-6 sm:p-8">
       <div className="relative flex items-center justify-between gap-4">
         <div>
-          <span className="inline-flex items-center gap-2 text-[0.78rem] font-semibold text-accent">
-            <span className="h-1.5 w-1.5 rounded-full bg-accent" />
-            New document
-          </span>
-          <h2 className="mt-2 font-serif text-[1.65rem] font-semibold leading-tight tracking-tight text-ink">
-            What are we studying today?
+          <NotebookEyebrow accent>open a new page</NotebookEyebrow>
+          <h2 className="mt-2 font-serif text-[1.55rem] font-semibold leading-tight tracking-tight text-ink">
+            What are you studying today?
           </h2>
+          <p className="mt-1 text-[0.86rem] text-ink-dim">
+            Drop a PDF or paste your notes — NoorAI reads it for you.
+          </p>
         </div>
         <Tabs
           value={tab}
-          onChange={setTab}
+          onChange={(v) => { play('tap'); setTab(v) }}
           options={[
             { value: 'paste', label: 'Paste text' },
             { value: 'file', label: 'Upload file' },
@@ -170,12 +172,9 @@ export default function UploadCard({ onUploaded }) {
         )}
       </AnimatePresence>
 
-      <div className="mt-6 flex flex-col-reverse items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-xs text-ink-muted">
-          We'll chunk and embed it locally so narration starts immediately.
-        </p>
+      <div className="mt-6 flex flex-col-reverse items-stretch gap-3 border-t border-rule pt-5 sm:flex-row sm:items-center sm:justify-end">
         <Button onClick={submit} disabled={!canSubmit} loading={busy} size="lg">
-          {busy ? 'Processing' : 'Continue'}
+          {busy ? 'Indexing' : 'Open the page'}
           {!busy && (
             <svg viewBox="0 0 24 24" className="ml-1 h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M5 12h14M13 5l7 7-7 7" />

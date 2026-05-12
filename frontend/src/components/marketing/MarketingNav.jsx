@@ -43,8 +43,8 @@ export default function MarketingNav() {
             : 'border-b border-transparent bg-transparent',
         ].join(' ')}
       >
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-5 sm:px-8">
-          <Link to="/" className="group flex items-center">
+        <div className="mx-auto flex h-14 max-w-7xl items-center justify-between gap-2 px-4 sm:h-16 sm:px-6 lg:px-8">
+          <Link to="/" className="group flex min-w-0 items-center">
             <NoorLogo />
           </Link>
 
@@ -61,16 +61,16 @@ export default function MarketingNav() {
             ))}
           </nav>
 
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
             <Link
               to="/login"
-              className="hidden rounded-full px-4 py-2 text-[0.88rem] font-medium text-echo-text/85 transition-colors hover:text-echo-accent-soft sm:inline-block"
+              className="hidden rounded-full px-3 py-2 text-[0.88rem] font-medium text-echo-text/85 transition-colors hover:text-echo-accent-soft sm:inline-block"
             >
               Sign in
             </Link>
             <Link
               to="/signup"
-              className="group inline-flex h-9 items-center gap-1.5 rounded-md bg-echo-accent px-4 text-[0.84rem] font-semibold text-echo-bg transition-colors duration-150 hover:bg-echo-accent-bright active:scale-[0.985]"
+              className="group inline-flex h-9 items-center gap-1.5 rounded-md bg-echo-accent px-3 text-[0.84rem] font-semibold text-echo-bg transition-colors duration-150 hover:bg-echo-accent-bright active:scale-[0.985] sm:px-4"
             >
               <span>Get started</span>
               <svg

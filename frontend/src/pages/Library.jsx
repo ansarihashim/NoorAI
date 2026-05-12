@@ -3,10 +3,12 @@ import { Link, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { deleteDocument, listDocuments } from '../lib/api.js'
 import { useToast } from '../components/ui/Toast.jsx'
+import { useSound } from '../lib/sound.jsx'
 import Button from '../components/ui/Button.jsx'
 import Pill from '../components/ui/Pill.jsx'
 import Skeleton from '../components/ui/Skeleton.jsx'
 import Dialog from '../components/ui/Dialog.jsx'
+import { NotebookEyebrow } from '../components/ui/NotebookSurface.jsx'
 
 function formatRelative(ts) {
   if (!ts) return ''
@@ -32,6 +34,7 @@ export default function Library() {
   const [deleting, setDeleting] = useState(false)
   const navigate = useNavigate()
   const toast = useToast()
+  const { play } = useSound()
 
   useEffect(() => {
     let cancelled = false
@@ -71,7 +74,8 @@ export default function Library() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-5 pb-24 pt-10 sm:px-8">
+    <div className="relative mx-auto max-w-5xl px-5 pb-24 pt-10 sm:px-8">
+      <span aria-hidden className="notebook-rule pointer-events-none absolute inset-0 -z-10" />
       <motion.div
         initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
@@ -79,14 +83,20 @@ export default function Library() {
         className="flex items-end justify-between gap-3"
       >
         <div>
-          <span className="font-caption text-ink-muted">your library</span>
-          <h1 className="mt-2 font-display text-title text-ink">Everything you've uploaded.</h1>
+          <NotebookEyebrow accent>full index</NotebookEyebrow>
+          <h1 className="mt-2 font-serif text-[clamp(1.8rem,3.4vw,2.4rem)] font-semibold leading-tight tracking-tight text-ink">
+            Every page in your notebook.
+          </h1>
+          <p className="mt-2 text-[0.92rem] text-ink-muted">
+            Sources you've uploaded — open one to study, or remove what's
+            no longer in scope.
+          </p>
         </div>
-        <Button as={Link} to="/app" variant="secondary" size="md">
+        <Button as={Link} to="/app" variant="secondary" size="md" onClick={() => play('tap')}>
           <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M12 5v14M5 12h14" />
           </svg>
-          New document
+          New page
         </Button>
       </motion.div>
 
@@ -121,18 +131,17 @@ export default function Library() {
         )}
 
         {docs !== null && docs.length === 0 && (
-          <div className="rounded-card border border-dashed border-white/[0.08] bg-white/[0.02] px-6 py-16 text-center">
-            <div className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-pill bg-gradient-to-br from-accent-purple/20 to-accent-cyan/20 text-accent-purple-soft ring-1 ring-white/[0.06]">
-              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M3 7l9-4 9 4M3 7v10l9 4 9-4V7M3 7l9 4M21 7l-9 4M12 11v10" />
-              </svg>
-            </div>
-            <h3 className="mt-4 text-base font-medium text-ink">Nothing here yet.</h3>
-            <p className="mx-auto mt-1.5 max-w-sm text-sm text-ink-muted">
-              Drop your first document to start a session. It'll show up here for later.
+          <div className="nb-page nb-page--margin px-6 py-14 text-center">
+            <NotebookEyebrow accent>blank notebook</NotebookEyebrow>
+            <h3 className="mt-3 font-serif text-[1.4rem] font-semibold leading-snug text-ink">
+              Nothing bound yet.
+            </h3>
+            <p className="mx-auto mt-2 max-w-sm text-[0.92rem] leading-relaxed text-ink-muted">
+              Drop your first source to begin the notebook. It'll appear in
+              the index and stay there for next time.
             </p>
-            <Button as={Link} to="/app" className="mt-6">
-              Upload something
+            <Button as={Link} to="/app" className="mt-6" onClick={() => play('tap')}>
+              Open a new page
             </Button>
           </div>
         )}
@@ -140,7 +149,7 @@ export default function Library() {
         {sorted && sorted.length > 0 && (
           <ul className="grid gap-3 sm:grid-cols-2">
             <AnimatePresence initial={false}>
-              {sorted.map((d) => (
+              {sorted.map((d, i) => (
                 <motion.li
                   key={d.id}
                   layout
@@ -148,22 +157,27 @@ export default function Library() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.97 }}
                   transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-                  className="glass group relative p-5"
+                  className="nb-card group relative p-5"
                 >
+                  <span className="nb-eyebrow absolute right-4 top-4 tabular-nums">
+                    {String(i + 1).padStart(2, '0')}
+                  </span>
                   <button
-                    onClick={() => navigate(`/app/session/${d.id}`)}
+                    onClick={() => { play('page'); navigate(`/app/session/${d.id}`) }}
                     className="block w-full text-left"
                   >
-                    <h3 className="line-clamp-2 pr-10 text-[0.95rem] font-medium text-ink">{d.title}</h3>
-                    <p className="mt-1 font-mono text-[0.7rem] text-ink-faint">{d.id}</p>
+                    <h3 className="line-clamp-2 pr-10 font-serif text-[1.05rem] font-medium leading-snug text-ink group-hover:text-accent">
+                      {d.title}
+                    </h3>
+                    <p className="mt-1 font-mono text-[0.66rem] tabular-nums text-ink-faint">
+                      {d.id.slice(0, 8)} · {d.n_chunks} ¶
+                    </p>
                     <div className="mt-3 flex items-center gap-2 text-[0.7rem] text-ink-muted">
                       <span>{formatRelative(d.created_at)}</span>
-                      <span aria-hidden>·</span>
-                      <span>{d.n_chunks} chunks</span>
                       {d.has_podcast && (
                         <>
-                          <span aria-hidden>·</span>
-                          <Pill tone="cyan" size="sm">Podcast ready</Pill>
+                          <span aria-hidden className="text-ink-faint">·</span>
+                          <Pill tone="cyan" size="sm">Discussion ready</Pill>
                         </>
                       )}
                     </div>

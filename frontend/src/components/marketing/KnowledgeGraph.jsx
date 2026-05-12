@@ -6,22 +6,22 @@ import { SectionHeader, FadeUp } from './primitives.jsx'
  * a "scanning" line walks across to suggest live AI synthesis.
  */
 const NODES = [
-  { id: 'main', label: 'Cellular Respiration', x: 50, y: 50, size: 'lg', tone: 'accent' },
-  { id: 'glyc', label: 'Glycolysis', x: 22, y: 28, size: 'md', tone: 'accent' },
-  { id: 'krebs', label: 'Krebs Cycle', x: 78, y: 28, size: 'md', tone: 'accent' },
-  { id: 'etc', label: 'Electron Transport', x: 78, y: 72, size: 'md', tone: 'accent' },
-  { id: 'atp', label: 'ATP Synthase', x: 22, y: 72, size: 'md', tone: 'sage' },
+  { id: 'main',   label: 'Modern AI',           x: 50, y: 50, size: 'lg', tone: 'accent' },
+  { id: 'trans',  label: 'Transformers',        x: 22, y: 28, size: 'md', tone: 'accent' },
+  { id: 'attn',   label: 'Attention',           x: 78, y: 28, size: 'md', tone: 'accent' },
+  { id: 'rag',    label: 'RAG · Retrieval',     x: 78, y: 72, size: 'md', tone: 'accent' },
+  { id: 'agent',  label: 'Agentic Systems',     x: 22, y: 72, size: 'md', tone: 'sage' },
 
-  { id: 'pyruvate', label: 'Pyruvate', x: 12, y: 50, size: 'sm', tone: 'muted' },
-  { id: 'nadh', label: 'NADH', x: 90, y: 50, size: 'sm', tone: 'muted' },
-  { id: 'oxygen', label: 'O₂', x: 50, y: 12, size: 'sm', tone: 'dusk' },
-  { id: 'water', label: 'H₂O + CO₂', x: 50, y: 88, size: 'sm', tone: 'muted' },
+  { id: 'tokens', label: 'Tokens',              x: 12, y: 50, size: 'sm', tone: 'muted' },
+  { id: 'vec',    label: 'Vector DB',           x: 90, y: 50, size: 'sm', tone: 'muted' },
+  { id: 'agi',    label: 'AGI',                 x: 50, y: 12, size: 'sm', tone: 'dusk' },
+  { id: 'tools',  label: 'Tool Use',            x: 50, y: 88, size: 'sm', tone: 'muted' },
 ]
 
 const EDGES = [
-  ['main', 'glyc'], ['main', 'krebs'], ['main', 'etc'], ['main', 'atp'],
-  ['glyc', 'pyruvate'], ['etc', 'nadh'], ['main', 'oxygen'], ['main', 'water'],
-  ['glyc', 'krebs'], ['krebs', 'etc'], ['etc', 'atp'],
+  ['main', 'trans'], ['main', 'attn'], ['main', 'rag'], ['main', 'agent'],
+  ['trans', 'tokens'], ['rag', 'vec'], ['main', 'agi'], ['main', 'tools'],
+  ['trans', 'attn'], ['attn', 'rag'], ['rag', 'agent'],
 ]
 
 function nodeColor(tone) {
@@ -165,7 +165,7 @@ export default function KnowledgeGraph() {
                 },
                 {
                   k: 'Dependency-aware retrieval',
-                  v: 'Ask about the Krebs cycle, NoorAI already knows you mean inside cellular respiration.',
+                  v: 'Ask about attention, NoorAI already knows you mean inside the transformer stack.',
                   icon: (
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z" />

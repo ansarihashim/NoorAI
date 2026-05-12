@@ -41,7 +41,7 @@ export default function BookVisual() {
               chapter · 04
             </div>
             <h3 className="mt-1 font-serif text-[1.4rem] font-semibold leading-tight tracking-tight text-echo-text">
-              Cellular Respiration
+              Deep Learning
             </h3>
             {/* yellow underline that "draws in" */}
             <motion.span
@@ -78,15 +78,15 @@ export default function BookVisual() {
                 />
               ))}
 
-              {/* equation badge */}
+              {/* equation badge — the canonical attention formula */}
               <motion.div
                 initial={reduce ? false : { opacity: 0, y: 8 }}
                 animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: 1.0, ease }}
                 className="mt-4 inline-flex items-center gap-2 rounded-md border border-echo-border bg-echo-bg px-2.5 py-1.5 font-mono text-[0.78rem] tabular-nums text-echo-text"
               >
-                <span className="text-echo-muted">eq.</span>
-                <span>C₆H₁₂O₆ + 6O₂ → 6CO₂ + 6H₂O</span>
+                <span className="text-echo-muted">attention</span>
+                <span>softmax(QKᵀ / √d) &nbsp;·&nbsp; V</span>
               </motion.div>
             </div>
 
@@ -128,7 +128,7 @@ export default function BookVisual() {
                   </span>
                 </div>
                 <p className="mt-2 font-serif text-[0.84rem] leading-snug text-echo-text">
-                  ATP yield jumps from 2 (glycolysis) to ~32 once oxygen is present — the entire purpose of the Krebs cycle.
+                  Every token attends to every other token in parallel — the softmax over scaled dot-products decides which ones to listen to. That parallelism is what let transformers scale.
                 </p>
                 {/* citation chips */}
                 <div className="mt-2.5 flex flex-wrap gap-1.5">
@@ -151,7 +151,7 @@ export default function BookVisual() {
                 className="mt-3 inline-flex items-center gap-1.5 text-[0.72rem] text-echo-muted"
               >
                 <span className="h-1 w-1 rounded-full bg-echo-accent" />
-                Linked to <span className="font-medium text-echo-text">Mitochondrial Membrane</span>
+                Linked to <span className="font-medium text-echo-text">Multi-Head Attention</span>
               </motion.div>
             </div>
           </div>
@@ -160,7 +160,7 @@ export default function BookVisual() {
           <div className="absolute inset-x-7 bottom-3 flex items-center justify-between text-[0.66rem] text-echo-muted/80">
             <span className="font-mono">— pg 12 —</span>
             <span className="flex items-center gap-1.5">
-              {['biology', 'metabolism', 'ATP'].map((t) => (
+              {['deep-learning', 'transformers', 'attention'].map((t) => (
                 <span key={t} className="rounded-pill border border-echo-border bg-echo-bg px-1.5 py-0.5 font-mono text-[0.6rem]">
                   {t}
                 </span>
@@ -179,7 +179,7 @@ export default function BookVisual() {
           <span className="h-1.5 w-1.5 rounded-full bg-echo-accent" />
           <span className="text-[0.74rem] font-semibold text-echo-text">
             Concept:&nbsp;
-            <span className="text-echo-accent">Krebs Cycle</span>
+            <span className="text-echo-accent">Self-Attention</span>
           </span>
         </motion.div>
 

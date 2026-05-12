@@ -83,12 +83,12 @@ export default function HeroVisual() {
         >
           <div className="flex items-center justify-between">
             <span className="text-[0.65rem] font-medium uppercase tracking-[0.2em] text-echo-muted">
-              Lecture · 04
+              AGI · Note 04
             </span>
             <span className="inline-flex h-1.5 w-1.5 rounded-full bg-echo-accent" />
           </div>
           <div className="mt-3 font-serif text-[0.95rem] leading-snug text-echo-text">
-            Mitochondria are the cell's <span className="rounded bg-echo-accent/20 px-1 text-echo-accent-soft">power-plants</span>, producing ATP via oxidative phosphorylation.
+            AGI does not just <span className="rounded bg-echo-accent/20 px-1 text-echo-accent-soft">automate tasks</span> — it recursively improves the systems that automate tasks.
           </div>
           <div className="mt-3 space-y-1.5">
             <div className="h-1 rounded-full bg-echo-text/10" />
@@ -119,7 +119,7 @@ export default function HeroVisual() {
             </span>
             <div className="min-w-0 flex-1">
               <div className="truncate text-[0.88rem] font-medium text-echo-text">
-                Cellular Respiration · Episode 02
+                Will AI replace humans? · Episode 02
               </div>
               <div className="text-[0.7rem] text-echo-muted">Host & Guest · 12:48 / 18:30</div>
             </div>
@@ -161,7 +161,7 @@ export default function HeroVisual() {
             </span>
           </div>
           <p className="mt-3 font-serif text-[0.88rem] leading-relaxed text-echo-text">
-            Think of ATP as a rechargeable battery — it stores energy that the cell spends on movement, synthesis, and signalling.
+            Humans may shift from execution toward direction, judgement, and creativity — the work AI still struggles to do well.
           </p>
         </motion.div>
       </motion.div>
@@ -179,7 +179,7 @@ export default function HeroVisual() {
           className="inline-flex items-center gap-1.5 rounded-full border border-echo-border bg-echo-surface/80 px-3 py-1.5 text-[0.7rem] font-medium tracking-wide text-echo-text shadow-floatSoft backdrop-blur-md"
         >
           <span className="h-1.5 w-1.5 rounded-full bg-echo-sage" />
-          Krebs Cycle
+          Transformers
         </motion.div>
       </motion.div>
 
@@ -196,7 +196,7 @@ export default function HeroVisual() {
           className="inline-flex items-center gap-1.5 rounded-full border border-echo-border bg-echo-surface/80 px-3 py-1.5 text-[0.7rem] font-medium tracking-wide text-echo-text shadow-floatSoft backdrop-blur-md"
         >
           <span className="h-1.5 w-1.5 rounded-full bg-echo-dusk" />
-          Electron Transport
+          RAG · Vector DB
         </motion.div>
       </motion.div>
 

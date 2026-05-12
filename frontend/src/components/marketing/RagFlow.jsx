@@ -15,12 +15,12 @@ import { SectionHeader, FadeUp } from './primitives.jsx'
 
 // ---------- chunk grid (left column) ----------
 const CHUNKS = [
-  { id: 'c1', label: 'Glycolysis · pg 4',          tag: 'NOTES',    weight: 0.92, retrieved: true  },
-  { id: 'c2', label: 'Krebs cycle intermediates',  tag: 'PDF',      weight: 0.88, retrieved: true  },
-  { id: 'c3', label: 'Mitochondrial membrane',     tag: 'NOTES',    weight: 0.41, retrieved: false },
-  { id: 'c4', label: 'ATP yield · table 2.1',      tag: 'TABLE',    weight: 0.74, retrieved: true  },
-  { id: 'c5', label: 'Photosynthesis intro',       tag: 'PDF',      weight: 0.18, retrieved: false },
-  { id: 'c6', label: 'Electron transport chain',   tag: 'DIAGRAM',  weight: 0.81, retrieved: true  },
+  { id: 'c1', label: 'Attention is all you need · pg 4', tag: 'NOTES',    weight: 0.92, retrieved: true  },
+  { id: 'c2', label: 'Self-attention matrix derivation', tag: 'PDF',      weight: 0.88, retrieved: true  },
+  { id: 'c3', label: 'Tokeniser internals · BPE',        tag: 'NOTES',    weight: 0.41, retrieved: false },
+  { id: 'c4', label: 'Scaling laws · table 2.1',         tag: 'TABLE',    weight: 0.74, retrieved: true  },
+  { id: 'c5', label: 'RNN history · intro',              tag: 'PDF',      weight: 0.18, retrieved: false },
+  { id: 'c6', label: 'KV cache + flash attention',       tag: 'DIAGRAM',  weight: 0.81, retrieved: true  },
 ]
 
 // ---------- answer column (right) ----------
@@ -51,7 +51,7 @@ export default function RagFlow() {
 
         <FadeUp className="mt-16" duration={0.9}>
           <div
-            className="relative grid gap-6 rounded-xl border border-echo-border bg-echo-surface p-5 sm:p-7 lg:grid-cols-[1.1fr_0.7fr_1fr]"
+            className="relative grid gap-5 rounded-xl border border-echo-border bg-echo-surface p-4 sm:gap-6 sm:p-7 lg:grid-cols-[1.1fr_0.7fr_1fr]"
           >
             {/* faint paper rule on the surface — keeps the lab/notebook feel */}
             <span aria-hidden className="rag-paper-rule" />
@@ -68,7 +68,7 @@ export default function RagFlow() {
                     viewport={{ once: true, margin: '-60px' }}
                     transition={{ duration: 0.5, delay: 0.05 * i, ease: [0.22, 1, 0.36, 1] }}
                     className={[
-                      'group relative flex items-center gap-3 rounded-md border bg-echo-bg px-3 py-2.5 transition-colors duration-200',
+                      'group relative flex min-w-0 items-center gap-3 rounded-md border bg-echo-bg px-3 py-2.5 transition-colors duration-200',
                       c.retrieved
                         ? 'border-echo-accent/45 ring-1 ring-echo-accent/15'
                         : 'border-echo-border opacity-60',

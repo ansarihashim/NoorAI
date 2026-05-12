@@ -5,14 +5,16 @@ import {
   generateOverview,
   getOverview,
 } from '../../lib/api.js'
+import { useMultiDocCitations, format as formatCitation } from '../../lib/citations.jsx'
 import { useToast } from '../ui/Toast.jsx'
 import Button from '../ui/Button.jsx'
 import Dialog from '../ui/Dialog.jsx'
 import Skeleton from '../ui/Skeleton.jsx'
-import MermaidRenderer from '../visualize/MermaidRenderer.jsx'
+import GenerationProgress, { OVERVIEW_STAGES } from '../ui/GenerationProgress.jsx'
 
 export default function OverviewView({ docIds, action }) {
   const toast = useToast()
+  const citationsByDoc = useMultiDocCitations(docIds)
   const [overview, setOverview] = useState(null) // null=loading|undefined=none|object=loaded
   const [busy, setBusy] = useState(false)
   const [confirmRegen, setConfirmRegen] = useState(false)
@@ -120,15 +122,6 @@ export default function OverviewView({ docIds, action }) {
         </Button>
       </div>
 
-      {/* Mermaid topic-dependency graph */}
-      {overview.mermaid && (
-        <div>
-          <div className="mb-2 font-caption text-ink-muted">topic dependency map</div>
-          <MermaidRenderer code={overview.mermaid} title={overview.title} />
-        </div>
-      )}
-
-      {/* Topic accordion */}
       <div>
         <div className="mb-2 font-caption text-ink-muted">topics</div>
         <div className="space-y-2">
@@ -189,15 +182,30 @@ export default function OverviewView({ docIds, action }) {
                         {t.chunks && t.chunks.length > 0 && (
                           <div className="mt-2 flex flex-wrap items-center gap-1 text-[0.65rem] text-ink-faint">
                             <span>Grounded in:</span>
-                            {t.chunks.map((c, k) => (
-                              <span
-                                key={k}
-                                className="rounded-pill bg-white/[0.04] px-1.5 py-0.5 font-mono"
-                                title={c.doc_id}
-                              >
-                                {c.doc_id.slice(0, 6)}#{c.chunk_idx}
-                              </span>
-                            ))}
+                            {(() => {
+                              // Group chunk indices by doc, then render one
+                              // chip per doc with a page-range label.
+                              const byDoc = new Map()
+                              for (const c of t.chunks) {
+                                if (!byDoc.has(c.doc_id)) byDoc.set(c.doc_id, [])
+                                byDoc.get(c.doc_id).push(c.chunk_idx)
+                              }
+                              const chips = []
+                              for (const [docId, idxs] of byDoc.entries()) {
+                                const meta = citationsByDoc[docId] || { pages: [], is_paged: false, format: null }
+                                const label = meta.format ? meta.format(idxs) : formatCitation(meta.pages, meta.is_paged, idxs)
+                                chips.push(
+                                  <span
+                                    key={docId}
+                                    className="rounded-pill bg-white/[0.04] px-1.5 py-0.5"
+                                    title={docId}
+                                  >
+                                    {label}
+                                  </span>,
+                                )
+                              }
+                              return chips
+                            })()}
                           </div>
                         )}
                       </div>
@@ -256,14 +264,26 @@ function EmptyState({ busy, onGenerate, nDocs }) {
           </svg>
         </div>
         <h3 className="mt-5 font-display text-xl font-semibold text-ink">
-          Build a syllabus overview.
+          {busy ? 'Building the overview…' : 'Build a syllabus overview.'}
         </h3>
-        <p className="mx-auto mt-2 max-w-sm text-pretty text-sm text-ink-muted">
-          A LangGraph pipeline analyses the {nDocs > 1 ? `${nDocs} documents` : 'document'}, identifies topics and dependencies, and produces a Mermaid map.
-        </p>
-        <Button onClick={onGenerate} loading={busy} size="lg" className="mt-6">
-          Build overview
-        </Button>
+        {!busy && (
+          <p className="mx-auto mt-2 max-w-sm text-pretty text-sm text-ink-muted">
+            A LangGraph pipeline analyses the {nDocs > 1 ? `${nDocs} documents` : 'document'}, identifies topics and dependencies, and produces a Mermaid map.
+          </p>
+        )}
+        {busy ? (
+          <div className="mt-6">
+            <GenerationProgress
+              active
+              stages={OVERVIEW_STAGES}
+              overrunLabel="Validating the dependency graph"
+            />
+          </div>
+        ) : (
+          <Button onClick={onGenerate} loading={busy} size="lg" className="mt-6">
+            Build overview
+          </Button>
+        )}
       </div>
     </div>
   )

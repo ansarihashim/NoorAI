@@ -63,7 +63,7 @@ export default function AuthArt() {
         </p>
         <div className="mt-3 flex items-center gap-2 text-xs text-ink-muted">
           <span className="inline-block h-6 w-6 rounded-full bg-gradient-to-br from-accent-cyan to-accent-green" />
-          <span>Early user · biology, year 2</span>
+          <span>Early user · ML research</span>
         </div>
       </motion.div>
     </div>

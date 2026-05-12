@@ -34,24 +34,45 @@ export function useMicStream({ onFrame } = {}) {
 
   const start = useCallback(async () => {
     if (active) return
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
-        channelCount: 1,
-      },
-    })
+
+    // CRITICAL: create the AudioContext SYNCHRONOUSLY inside the gesture
+    // tick. Doing it after `await getUserMedia` puts us outside the user-
+    // gesture window, browsers leave the context "suspended", and the
+    // worklet's process() is never pulled → mic delivers zero frames to
+    // the WebSocket. We also explicitly resume() below in case the context
+    // still started suspended (Safari, some Chrome flag combos).
+    const Ctx = window.AudioContext || window.webkitAudioContext
+    const ctx = new Ctx()
+    ctxRef.current = ctx
+
+    let stream
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          channelCount: 1,
+        },
+      })
+    } catch (err) {
+      try { await ctx.close() } catch { /* no-op */ }
+      ctxRef.current = null
+      throw err
+    }
     streamRef.current = stream
 
-    const ctx = new (window.AudioContext || window.webkitAudioContext)()
-    ctxRef.current = ctx
+    if (ctx.state === 'suspended') {
+      try { await ctx.resume() } catch (err) { console.warn('[mic] ctx.resume failed', err) }
+    }
+
     await ctx.audioWorklet.addModule('/pcm-capture.js')
 
     const source = ctx.createMediaStreamSource(stream)
     const node = new AudioWorkletNode(ctx, 'pcm-capture', {
       numberOfInputs: 1,
-      numberOfOutputs: 0,
+      numberOfOutputs: 1,                 // 1 output so the graph pulls the node
+      outputChannelCount: [1],
       processorOptions: { targetRate: 16000 },
     })
     nodeRef.current = node
@@ -68,6 +89,14 @@ export function useMicStream({ onFrame } = {}) {
     }
 
     source.connect(node)
+    // Connect node → destination so the audio graph "pulls" the processor.
+    // We don't actually want to hear the mic, so route through a silent
+    // gain node. With numberOfOutputs:0 the graph wouldn't pull the worklet
+    // reliably and process() could be skipped, especially on Chrome.
+    const silentGain = ctx.createGain()
+    silentGain.gain.value = 0
+    node.connect(silentGain).connect(ctx.destination)
+
     setActive(true)
   }, [active])
 

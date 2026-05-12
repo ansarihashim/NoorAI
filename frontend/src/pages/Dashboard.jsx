@@ -119,7 +119,7 @@ export default function Dashboard() {
             <div className="mt-0.5 text-[0.7rem] text-ink-faint">
               {continueDoc.pos.mode === 'podcast'
                 ? `Podcast · turn ${(continueDoc.pos.podcastIdx ?? 0) + 1}`
-                : `Narration · chunk ${(continueDoc.pos.narrationIdx ?? 0) + 1}`}
+                : `Narration · ¶ ${(continueDoc.pos.narrationIdx ?? 0) + 1}`}
             </div>
           </div>
           <span className="hidden text-xs text-ink-muted transition-colors group-hover:text-ink sm:inline">
@@ -189,7 +189,7 @@ export default function Dashboard() {
                   </div>
                   <div className="flex flex-col items-end gap-1.5">
                     <Pill tone="purple" size="sm">
-                      {doc.n_chunks} chunks
+                      {doc.n_chunks} ¶
                     </Pill>
                     {doc.has_podcast && (
                       <Pill tone="cyan" size="sm">

@@ -32,7 +32,7 @@ You also need API keys (free tiers all work):
 
 ---
 
-## One-time setup
+## One-time local setup
 
 ### Backend
 ```powershell
@@ -45,10 +45,10 @@ copy .env.example .env
 # Edit .env with your API keys + DATABASE_URL
 
 # Pre-download the Whisper model (~140MB, runs once)
-python -m backend.scripts.download_whisper
+python -m app.scripts.download_whisper
 
 # Apply DB schema
-alembic -c backend/alembic.ini upgrade head
+alembic -c alembic.ini upgrade head
 ```
 
 ### Frontend
@@ -63,11 +63,11 @@ copy .env.example .env
 
 ## Run dev servers (two terminals)
 
-**Terminal 1 — backend** (run from project root, since modules use `backend.` prefix):
+**Terminal 1 — backend** (run from `backend/`, the `app.` package is at the root):
 ```powershell
-cd C:\Users\hashi\Desktop\eco
-.\backend\.venv\Scripts\Activate.ps1
-uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
+cd C:\Users\hashi\Desktop\eco\backend
+.\.venv\Scripts\Activate.ps1
+uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
 **Terminal 2 — frontend:**
@@ -76,7 +76,7 @@ cd C:\Users\hashi\Desktop\eco\frontend
 npm run dev
 ```
 
-Open http://localhost:5173, click **Start**, allow mic permission. Paste a few paragraphs of notes, hit **Start narration**, then speak mid-narration to interrupt and ask a question.
+Open http://localhost:5173, sign up, upload a PDF, then start narration or ask a doubt.
 
 ---
 
@@ -84,43 +84,97 @@ Open http://localhost:5173, click **Start**, allow mic permission. Paste a few p
 
 ```
 eco/
-├── PLAN.md                    architecture + build plan
-├── README.md                  this file
-├── backend/
-│   ├── main.py                FastAPI app
-│   ├── routes/                upload, llm, tts (REST), audio (WebSocket)
-│   ├── services/              whisper, rag, groq, tts, session FSM
-│   ├── utils/                 audio_utils, vad, chunker
-│   ├── models/                SQLAlchemy models
-│   ├── db/                    engine, alembic migrations
-│   ├── config/                pydantic-settings
-│   └── scripts/               download_whisper.py
-└── frontend/
-    ├── public/pcm-capture.js  AudioWorklet (16kHz int16 PCM downsampler)
-    └── src/
-        ├── pages/             Home, Session
-        ├── components/        UploadPanel, MicButton, WaveformViz, TranscriptLog, StatusPill
-        ├── hooks/             useWebSocket, useMicStream, useAudioPlayer
-        └── lib/               api.js
+├── README.md
+├── .gitignore
+│
+├── frontend/                       Vercel target
+│   ├── public/pcm-capture.js       AudioWorklet (16 kHz int16 PCM downsampler)
+│   ├── src/
+│   │   ├── components/             Workspace, preparation, revision, session, marketing, ui
+│   │   ├── hooks/                  useWebSocket, useMicStream, useAudioPlayer, useAudio…
+│   │   ├── lib/                    api.js, auth.jsx, citations.jsx, sanitize.js, sound.jsx
+│   │   └── pages/                  Landing, Login, Signup, Library, Settings, Session, NotFound
+│   ├── index.html
+│   ├── package.json
+│   ├── vite.config.js
+│   ├── tailwind.config.js
+│   ├── postcss.config.js
+│   ├── vercel.json                 SPA rewrite + cache headers + security headers
+│   └── .env.example                VITE_API_URL + VITE_WS_URL
+│
+└── backend/                        Render target
+    ├── app/                        the Python package (`app.main:app`)
+    │   ├── main.py                 FastAPI app, CORS, security headers, routers
+    │   ├── core/                   pydantic-settings
+    │   ├── api/                    REST routers (auth, upload, documents, llm, tts,
+    │   │                              narration, podcast, visuals, preparation,
+    │   │                              revision, voices)
+    │   ├── websocket/audio.py      /ws/audio handler with JWT-in-query + origin check
+    │   ├── auth/                   JWT + password + dependency helpers
+    │   ├── services/               groq, tts, whisper, narration, podcast, visual,
+    │   │                              session FSM, preparation, revision
+    │   ├── rag/                    FAISS service, retriever, chunker, chains,
+    │   │                              graphs, prompts, schemas
+    │   ├── models/                 User, Document, Session, Message
+    │   ├── db/                     async engine, alembic env, 3 migrations
+    │   ├── utils/                  vad, rate_limit, security_input, security_middleware,
+    │   │                              audio_utils, voices_catalog
+    │   └── scripts/download_whisper.py
+    ├── alembic.ini
+    ├── requirements.txt
+    ├── runtime.txt                 Python 3.11.9 pin for Render
+    ├── render.yaml                 Render Blueprint (build + start + env vars)
+    ├── Dockerfile                  optional, for local Docker / non-Render hosts
+    └── .env.example
 ```
 
 ---
 
-## Verification checklist
+## Production deployment
 
-- [ ] `python -m backend.scripts.download_whisper` finishes and prints model path
-- [ ] `GET http://localhost:8000/` returns `{"status":"ok"}`
-- [ ] `npm run dev` opens with no console errors
-- [ ] Paste a 500-word note → narration starts within ~2s
-- [ ] Speak mid-narration → narration cuts within ~500ms, status flips `narrating → listening → thinking → speaking`, answer plays, narration resumes
-- [ ] Force ElevenLabs failure (rotate key to invalid) → Google TTS takes over silently
+### Prerequisites (free tier on every line)
 
----
+| Component | Provider | Notes |
+|---|---|---|
+| Frontend | **Vercel** | free, auto-deploy on push |
+| Backend  | **Render** | free Web Service plan (512 MB RAM, spins down after 15 min idle, no disk) |
+| Database | **Neon**   | free Postgres, 0.5 GB |
+| LLM      | **Groq**   | free tier, rate-limited |
+| TTS      | **Edge-TTS** (Microsoft) | free, no API key — used automatically when ElevenLabs/Google envs are blank |
 
-## Deployment
+### Deploy the backend (Render)
 
-- **Frontend → Vercel:** point at the `frontend/` directory; set `VITE_API_BASE` and `VITE_WS_URL` to your backend's https/wss URL.
-- **Backend → Render or Fly.io:** deploy `backend/Dockerfile` (it bakes in ffmpeg + pre-downloads the Whisper model). Set all `.env` vars in the dashboard. Mount a persistent volume at `/data/storage` so FAISS indexes survive restarts.
+1. Push the repo to GitHub.
+2. Render Dashboard → New → Blueprint → connect this repo. Render reads `backend/render.yaml`.
+3. Fill in the `sync: false` env vars in the prompt:
+   - `GROQ_API_KEY` — from console.groq.com
+   - `DATABASE_URL` — your Neon string in `postgresql+asyncpg://user:pass@host/db?ssl=require` form
+   - `CORS_ORIGINS` — your Vercel URL (set once it's live; can revisit)
+   - `FRONTEND_URL` — same Vercel URL
+4. Click Create. Build takes 6–10 minutes (Whisper + sentence-transformers pre-download + alembic upgrade).
+5. Once green: `curl https://<service>.onrender.com/healthz` → `{"ok":true}`.
+
+The blueprint already sets `WHISPER_MODEL=tiny.en` and `STORAGE_DIR=/tmp/storage` for the 512 MB free tier. FAISS indices and chunks are mirrored to the `rag_indices` table in Postgres on every upload, so uploaded documents survive the every-15-minute disk wipe.
+
+### Deploy the frontend (Vercel)
+
+1. Vercel Dashboard → New Project → import the same GitHub repo.
+2. Settings:
+   - Root Directory: `frontend`
+   - Framework: Vite (auto-detected)
+   - Build Command: `npm run build`
+   - Output Directory: `dist`
+3. Environment Variables (Production):
+   - `VITE_API_URL` = `https://<service>.onrender.com`
+   - `VITE_WS_URL`  = `wss://<service>.onrender.com/ws/audio`
+4. Deploy. Then go back to Render and set `CORS_ORIGINS` to the Vercel URL → Manual Deploy → Clear build cache & deploy.
+
+### Verification (post-deploy)
+
+1. `curl https://<service>.onrender.com/healthz` → `{"ok":true}`
+2. Open the Vercel URL → sign up → upload a 1-3 page PDF
+3. Wait 16 minutes (forces a Render cold start) → reopen the doc → Overview still generates → confirms FAISS-in-Postgres hydration is working
+4. Click Ask-a-doubt → speak → audio reply plays → confirms wss:// upgrade through Render's edge + mic worklet + Whisper
 
 ---
 

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { deleteRecall, generateRecall, getRecall } from '../../lib/api.js'
+import { useCitations } from '../../lib/citations.jsx'
 import { useToast } from '../ui/Toast.jsx'
 import Button from '../ui/Button.jsx'
 import Dialog from '../ui/Dialog.jsx'
@@ -24,6 +25,7 @@ const KIND_TONE = {
 
 export default function ActiveRecallView({ docId, action }) {
   const toast = useToast()
+  const citations = useCitations()
   const [set, setSet] = useState(null)
   const [busy, setBusy] = useState(false)
   const [n, setN] = useState(12)
@@ -146,7 +148,7 @@ export default function ActiveRecallView({ docId, action }) {
             {KIND_LABEL[p.kind] || p.kind}
           </span>
           <span className="font-mono text-[0.65rem] text-ink-faint">
-            {(p.grounded_chunks || []).map((c) => `#${c}`).join(' · ')}
+            {citations.format(p.grounded_chunks || [])}
           </span>
         </div>
 

@@ -9,6 +9,7 @@ import { useToast } from '../ui/Toast.jsx'
 import Button from '../ui/Button.jsx'
 import Dialog from '../ui/Dialog.jsx'
 import Skeleton from '../ui/Skeleton.jsx'
+import GenerationProgress, { REVISION_STAGES } from '../ui/GenerationProgress.jsx'
 import FlashcardDeck from './FlashcardDeck.jsx'
 
 const N_OPTIONS = [10, 15, 20, 30]
@@ -200,22 +201,28 @@ function EmptyState({ n, onN, busy, onGenerate }) {
           </svg>
         </div>
         <h3 className="mt-5 font-display text-xl font-semibold text-ink">
-          Generate flashcards from this document.
+          {busy ? `Generating ${n} flashcards…` : 'Generate flashcards from this document.'}
         </h3>
-        <p className="mx-auto mt-2 max-w-sm text-pretty text-sm text-ink-muted">
-          Each card is grounded in your notes — every answer cites the chunks it came from. Tap to flip, ←/→ to move, B to bookmark.
-        </p>
-        <div className="mt-6 inline-flex items-center gap-3">
-          <NSelect value={n} onChange={onN} disabled={busy} />
-          <Button onClick={onGenerate} loading={busy} size="lg">
-            {!busy && (
+        {!busy && (
+          <p className="mx-auto mt-2 max-w-sm text-pretty text-sm text-ink-muted">
+            Each card is grounded in your notes — every answer cites the chunks it came from. Tap to flip, ←/→ to move, B to bookmark.
+          </p>
+        )}
+        {busy ? (
+          <div className="mt-6">
+            <GenerationProgress active stages={REVISION_STAGES} />
+          </div>
+        ) : (
+          <div className="mt-6 inline-flex items-center gap-3">
+            <NSelect value={n} onChange={onN} disabled={busy} />
+            <Button onClick={onGenerate} loading={busy} size="lg">
               <svg viewBox="0 0 24 24" className="mr-1 h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M5 3v4M3 5h4M19 17v4M17 19h4M11 11l5-5M13 13l-5 5" />
               </svg>
-            )}
-            Generate {n} cards
-          </Button>
-        </div>
+              Generate {n} cards
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   )

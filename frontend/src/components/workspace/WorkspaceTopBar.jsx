@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../../lib/auth.jsx'
+import { useSound } from '../../lib/sound.jsx'
 import { LogoMark } from '../ui/Logo.jsx'
 import Avatar from '../ui/Avatar.jsx'
+import DemoBadge from '../ui/DemoBadge.jsx'
 import { useWorkspace } from './WorkspaceContext.jsx'
 
 /**
@@ -18,6 +20,7 @@ export default function WorkspaceTopBar() {
   const location = useLocation()
   const params = useParams()
   const { docs, sourcesCollapsed, setSourcesCollapsed, studioCollapsed, setStudioCollapsed } = useWorkspace()
+  const { play, muted, toggleMuted } = useSound()
   const [menuOpen, setMenuOpen] = useState(false)
 
   const docId = params.docId
@@ -44,6 +47,7 @@ export default function WorkspaceTopBar() {
   }, [menuOpen])
 
   async function onSignOut() {
+    play('page')
     setMenuOpen(false)
     try {
       await logout()
@@ -54,60 +58,87 @@ export default function WorkspaceTopBar() {
   }
 
   return (
-    <header className="flex h-14 items-center justify-between border-b border-rule bg-raised px-3">
-      {/* Left cluster — rail toggle + brand + breadcrumb */}
-      <div className="flex min-w-0 items-center gap-2">
+    <header className="relative flex h-14 items-center justify-between border-b border-rule bg-raised px-3">
+      {/* faint horizontal hairline at the bottom edge — gives the bar the
+          same paper-rule cadence as everything else in the workspace */}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-px"
+        style={{ background: 'linear-gradient(90deg, transparent, rgba(255,214,10,0.18), transparent)' }}
+      />
+
+      {/* Left cluster — rail toggle + brand + breadcrumb. min-w-0 + flex-1
+          let the doc title truncate cleanly when the bar runs out of room. */}
+      <div className="flex min-w-0 flex-1 items-center gap-2">
         <RailToggle
           side="left"
           collapsed={sourcesCollapsed}
           onClick={() => setSourcesCollapsed((v) => !v)}
-          label="Sources"
+          label="Index"
         />
-        <Link to="/app" className="ml-1 flex items-center gap-2.5 rounded-md px-2 py-1.5 transition-colors duration-150 hover:bg-elevated">
+        <Link
+          to="/app"
+          className="ml-1 flex shrink-0 items-center gap-2 rounded-md px-2 py-1.5 transition-colors duration-150 hover:bg-elevated sm:gap-2.5"
+        >
           <LogoMark size={24} />
-          <span className="font-serif text-[1.05rem] font-semibold tracking-tight text-ink">
+          <span className="font-serif text-[clamp(0.95rem,2.4vw,1.05rem)] font-semibold tracking-tight text-ink">
             Noor<span className="text-accent">AI</span>
           </span>
         </Link>
         {inSession && activeDoc && (
-          <>
-            <span className="mx-1.5 text-ink-faint">/</span>
-            <span className="truncate font-serif text-[0.92rem] font-medium text-ink-muted" title={activeDoc.title}>
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <span className="hidden shrink-0 font-mono text-[0.66rem] uppercase tracking-[0.16em] text-ink-faint sm:inline">
+              page
+            </span>
+            <span
+              className="min-w-0 flex-1 truncate font-serif text-[clamp(0.85rem,2.4vw,0.95rem)] font-medium text-ink"
+              title={activeDoc.title}
+            >
               {activeDoc.title}
             </span>
-          </>
+          </div>
         )}
       </div>
 
-      {/* Right cluster — studio toggle + user */}
-      <div className="flex items-center gap-2">
+      {/* Right cluster — demo badge + studio toggle + sound + user. shrink-0
+          so this cluster never collapses when the doc title needs to truncate. */}
+      <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+        <DemoBadge />
         <RailToggle
           side="right"
           collapsed={studioCollapsed}
           onClick={() => setStudioCollapsed((v) => !v)}
           label="AI Studio"
         />
+        <SoundToggle muted={muted} onClick={() => { toggleMuted(); play('tap') }} />
         {user && (
           <div className="relative" data-user-menu>
             <button
               onClick={() => setMenuOpen((v) => !v)}
-              className="flex items-center gap-2 rounded-full border border-rule bg-elevated py-1 pl-1.5 pr-3 text-[0.84rem] font-medium text-ink-muted transition-colors duration-150 hover:border-rule-strong hover:bg-float hover:text-ink"
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
+              className="flex items-center gap-2 rounded-full border border-rule bg-elevated py-1 pl-1.5 pr-2 text-[0.84rem] font-medium text-ink-muted transition-colors duration-150 hover:border-rule-strong hover:bg-float hover:text-ink sm:pr-3"
             >
               <Avatar name={user.display_name} email={user.email} size={22} />
-              <span className="hidden sm:inline">{user.display_name || user.email.split('@')[0]}</span>
-              <svg viewBox="0 0 24 24" className="h-3 w-3 opacity-70" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6" /></svg>
+              <span className="hidden max-w-[140px] truncate md:inline">
+                {user.display_name || user.email.split('@')[0]}
+              </span>
+              <svg viewBox="0 0 24 24" className="h-3 w-3 shrink-0 opacity-70" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6" /></svg>
             </button>
             <AnimatePresence>
               {menuOpen && (
                 <motion.div
+                  role="menu"
                   initial={{ opacity: 0, y: -4 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -2 }}
                   transition={{ duration: 0.14, ease: [0.16, 1, 0.3, 1] }}
-                  className="surface-floating absolute right-0 mt-1.5 w-56 overflow-hidden p-1.5"
+                  className="surface-floating absolute right-0 z-50 mt-1.5 w-[min(86vw,15rem)] overflow-hidden p-1.5"
                 >
                   <div className="px-2.5 py-2">
-                    <div className="text-[0.85rem] font-medium text-ink">{user.display_name || 'You'}</div>
+                    <div className="truncate text-[0.85rem] font-medium text-ink">
+                      {user.display_name || 'You'}
+                    </div>
                     <div className="mt-0.5 truncate text-[0.75rem] text-ink-dim">{user.email}</div>
                   </div>
                   <div className="divider-soft my-1" />
@@ -145,6 +176,35 @@ function RailToggle({ side, collapsed, onClick, label }) {
           <>
             <rect x="3" y="4" width="18" height="16" rx="2" />
             <line x1="15" y1="4" x2="15" y2="20" />
+          </>
+        )}
+      </svg>
+    </button>
+  )
+}
+
+function SoundToggle({ muted, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={muted ? 'Notebook sounds: off' : 'Notebook sounds: on'}
+      aria-label={muted ? 'Enable notebook sounds' : 'Mute notebook sounds'}
+      aria-pressed={!muted}
+      className="inline-flex h-7 w-7 items-center justify-center rounded-sm text-ink-dim transition-colors hover:bg-elevated hover:text-ink"
+    >
+      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+        {muted ? (
+          <>
+            {/* speaker silhouette + diagonal slash = muted */}
+            <path d="M11 5L6 9H3v6h3l5 4z" />
+            <path d="M19 5L5 19" />
+          </>
+        ) : (
+          <>
+            {/* speaker silhouette + small wave = audible (subtle) */}
+            <path d="M11 5L6 9H3v6h3l5 4z" />
+            <path d="M16 9c1.2 1.6 1.2 4.4 0 6" />
           </>
         )}
       </svg>

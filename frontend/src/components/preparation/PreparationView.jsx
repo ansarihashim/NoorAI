@@ -65,7 +65,7 @@ export default function PreparationView({ activeDocId }) {
     <div className="flex h-full flex-col">
       {/* Sub-tab strip — text-link style with amber underline */}
       <div className="border-b border-rule px-5 py-2">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3">
           <div className="flex items-center gap-5 overflow-x-auto">
             {SUB_TABS.map((t) => {
               const active = tab === t.value
@@ -119,7 +119,7 @@ export default function PreparationView({ activeDocId }) {
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
               transition={{ duration: 0.22 }}
-              className="mx-auto max-w-5xl overflow-hidden"
+              className="mx-auto max-w-7xl overflow-hidden"
             >
               <div className="pt-3">
                 <DocPicker
@@ -135,7 +135,7 @@ export default function PreparationView({ activeDocId }) {
 
       {/* Body */}
       <div className="flex-1 overflow-auto">
-        <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-8">
+        <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
           {docIds.length === 0 ? (
             <div className="grid place-items-center py-16 text-center">
               <p className="max-w-sm text-sm text-ink-muted">

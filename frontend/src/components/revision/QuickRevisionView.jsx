@@ -5,6 +5,7 @@ import {
   generateQuickRevision,
   getQuickRevision,
 } from '../../lib/api.js'
+import { useCitations } from '../../lib/citations.jsx'
 import { useToast } from '../ui/Toast.jsx'
 import Button from '../ui/Button.jsx'
 import Dialog from '../ui/Dialog.jsx'
@@ -13,6 +14,7 @@ import Skeleton from '../ui/Skeleton.jsx'
 const TOPIC_OPTIONS = [5, 8, 10, 15]
 
 export default function QuickRevisionView({ docId, action }) {
+  const citations = useCitations()
   const toast = useToast()
   const [set, setSet] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -159,7 +161,7 @@ export default function QuickRevisionView({ docId, action }) {
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="hidden font-mono text-[0.65rem] text-ink-faint sm:inline">
-                      {(t.grounded_chunks || []).map((c) => `#${c}`).join(' · ')}
+                      {citations.format(t.grounded_chunks || [])}
                     </span>
                     <motion.svg
                       viewBox="0 0 24 24"

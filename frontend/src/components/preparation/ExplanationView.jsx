@@ -3,16 +3,19 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { generateExplanation } from '../../lib/api.js'
 import { useToast } from '../ui/Toast.jsx'
 import Button from '../ui/Button.jsx'
+import GenerationProgress, { EXPLANATION_STAGES } from '../ui/GenerationProgress.jsx'
+import { useMultiDocCitations, format as formatCitation } from '../../lib/citations.jsx'
 
 const SAMPLE_TOPICS = [
-  'Glycolysis',
-  'The citric acid cycle',
-  'Why fermentation produces less ATP',
-  'Oxidative phosphorylation',
+  'Attention mechanism',
+  'Why transformers replaced RNNs',
+  'How RAG grounds an LLM',
+  'Reinforcement learning, in one paragraph',
 ]
 
 export default function ExplanationView({ docIds, action }) {
   const toast = useToast()
+  const citationsByDoc = useMultiDocCitations(docIds)
   const inputRef = useRef(null)
   const [topic, setTopic] = useState('')
   const [busy, setBusy] = useState(false)
@@ -30,7 +33,7 @@ export default function ExplanationView({ docIds, action }) {
   const onGenerate = useCallback(async () => {
     const t = topic.trim()
     if (!t) {
-      toast.error('Tell me what to explain', 'Try "the citric acid cycle"')
+      toast.error('Tell me what to explain', 'Try "attention mechanism"')
       return
     }
     if (busy) return
@@ -69,7 +72,7 @@ export default function ExplanationView({ docIds, action }) {
           type="text"
           value={topic}
           onChange={(e) => setTopic(e.target.value)}
-          placeholder="Type a topic (e.g. Glycolysis)"
+          placeholder="Type a topic (e.g. Attention mechanism)"
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
               e.preventDefault()
@@ -81,7 +84,11 @@ export default function ExplanationView({ docIds, action }) {
         <Button onClick={onGenerate} loading={busy} size="md">Explain</Button>
       </div>
 
-      {!exp && (
+      {busy && (
+        <GenerationProgress active stages={EXPLANATION_STAGES} className="my-3" />
+      )}
+
+      {!exp && !busy && (
         <div className="flex flex-wrap gap-2">
           <span className="text-[0.7rem] text-ink-faint">try:</span>
           {SAMPLE_TOPICS.map((s) => (
@@ -147,15 +154,26 @@ export default function ExplanationView({ docIds, action }) {
             {exp.chunks && exp.chunks.length > 0 && (
               <div className="flex flex-wrap items-center gap-1.5 border-t border-white/[0.05] pt-3 text-[0.65rem] text-ink-faint">
                 <span>Grounded in:</span>
-                {exp.chunks.map((c, k) => (
-                  <span
-                    key={k}
-                    className="rounded-pill bg-white/[0.04] px-1.5 py-0.5 font-mono"
-                    title={c.doc_id}
-                  >
-                    {c.doc_id.slice(0, 6)}#{c.chunk_idx}
-                  </span>
-                ))}
+                {(() => {
+                  const byDoc = new Map()
+                  for (const c of exp.chunks) {
+                    if (!byDoc.has(c.doc_id)) byDoc.set(c.doc_id, [])
+                    byDoc.get(c.doc_id).push(c.chunk_idx)
+                  }
+                  return [...byDoc.entries()].map(([docId, idxs]) => {
+                    const meta = citationsByDoc[docId] || { pages: [], is_paged: false, format: null }
+                    const label = meta.format ? meta.format(idxs) : formatCitation(meta.pages, meta.is_paged, idxs)
+                    return (
+                      <span
+                        key={docId}
+                        className="rounded-pill bg-white/[0.04] px-1.5 py-0.5"
+                        title={docId}
+                      >
+                        {label}
+                      </span>
+                    )
+                  })
+                })()}
               </div>
             )}
           </motion.div>

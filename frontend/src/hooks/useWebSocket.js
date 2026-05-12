@@ -1,7 +1,20 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { getToken } from '../lib/api.js'
 
-const URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws/audio'
+// Resolve the WS endpoint at module load. Runtime safety net: if the page
+// is served over HTTPS (Vercel always is) and the env left us with a plain
+// ws:// scheme, browsers reject the upgrade as mixed-content. Force wss://
+// in that case so a misconfigured env can never produce a silently broken
+// build.
+function resolveWsUrl() {
+  let raw = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws/audio'
+  if (typeof window !== 'undefined' && window.location?.protocol === 'https:' && raw.startsWith('ws://')) {
+    raw = 'wss://' + raw.slice('ws://'.length)
+  }
+  return raw
+}
+
+const URL = resolveWsUrl()
 const HEARTBEAT_MS = 25_000
 const MAX_BACKOFF_MS = 8_000
 const INITIAL_BACKOFF_MS = 500

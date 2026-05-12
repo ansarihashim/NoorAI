@@ -40,7 +40,7 @@ export default function InteractiveDemo() {
                 </div>
                 <div className="flex items-center gap-2 rounded-full border border-echo-border bg-echo-bg/60 px-3 py-1 text-[0.7rem] font-mono text-echo-muted">
                   <span className="h-1.5 w-1.5 rounded-full bg-echo-accent" />
-                  noor.ai / session / <span className="text-echo-text">cellular-respiration.pdf</span>
+                  noor.ai / session / <span className="text-echo-text">will-ai-replace-humans.pdf</span>
                 </div>
                 <div className="flex items-center gap-2 text-[0.7rem] text-echo-muted">
                   <span>Hashim's space</span>
@@ -89,7 +89,7 @@ function SourcePane() {
           </span>
           <div className="min-w-0 flex-1">
             <div className="truncate text-[0.85rem] font-medium text-echo-text">
-              Cellular Respiration · Lecture 04
+              Will AI Replace Humans? · Essay 03
             </div>
             <div className="text-[0.7rem] text-echo-muted">PDF · 18 pages · 1.2 MB</div>
           </div>
@@ -98,7 +98,7 @@ function SourcePane() {
           <div className="h-full w-full rounded-full bg-echo-accent" />
         </div>
         <div className="mt-2 flex items-center justify-between text-[0.65rem] text-echo-muted">
-          <span>Indexed · 132 chunks</span>
+          <span>Indexed · 132 passages</span>
           <span className="font-semibold text-echo-accent">Ready</span>
         </div>
       </div>
@@ -110,8 +110,8 @@ function SourcePane() {
         </div>
         <div className="flex flex-wrap gap-1.5">
           {[
-            'Glycolysis', 'Krebs Cycle', 'ATP Synthase', 'Electron Transport',
-            'Mitochondria', 'Anaerobic', 'NADH', 'Pyruvate',
+            'AGI', 'Automation', 'Intelligence Explosion', 'Human–AI Collaboration',
+            'Copilots', 'Reasoning', 'Future of Work', 'Alignment',
           ].map((c, i) => (
             <span
               key={c}
@@ -150,13 +150,13 @@ function NarrationPane() {
       {/* Reading paragraph with highlight */}
       <div className="rounded-xl border border-echo-border bg-echo-surface/60 p-4">
         <p className="font-serif text-[0.95rem] leading-relaxed text-echo-text">
-          The mitochondria are responsible for producing most of a cell's
-          {' '}
-          <span className="rounded bg-echo-accent px-1 font-semibold text-echo-bg">ATP</span>
-          {' '}through a process called{' '}
-          <span className="rounded bg-echo-accent px-1 font-semibold text-echo-bg">oxidative phosphorylation</span>.
-          This occurs along the inner membrane, where electron carriers feed{' '}
-          <span className="text-echo-muted">the electron transport chain.</span>
+          AGI does not simply{' '}
+          <span className="rounded bg-echo-accent px-1 font-semibold text-echo-bg">automate tasks</span>
+          {' '}— it recursively improves the{' '}
+          <span className="rounded bg-echo-accent px-1 font-semibold text-echo-bg">systems</span>
+          {' '}that automate tasks. The output of each generation becomes the{' '}
+          <span className="text-echo-muted">infrastructure</span>
+          {' '}of the next.
         </p>
       </div>
 
@@ -168,15 +168,15 @@ function NarrationPane() {
         <ul className="space-y-1.5 text-[0.82rem] leading-relaxed text-echo-muted">
           <li className="flex gap-2">
             <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-echo-accent" />
-            ATP is the cell's primary energy currency.
+            Narrow AI optimises a task; AGI optimises the optimisers.
           </li>
           <li className="flex gap-2">
             <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-echo-accent" />
-            Mitochondria use oxygen to maximize ATP yield.
+            Each capability tier compounds the next — tools build tools.
           </li>
           <li className="flex gap-2">
             <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-echo-accent" />
-            The electron transport chain drives synthesis.
+            Human leverage shifts from doing to directing.
           </li>
         </ul>
       </div>
@@ -219,7 +219,7 @@ function ReplyPane() {
           You
         </div>
         <div className="mt-1 text-[0.85rem] leading-relaxed text-echo-text">
-          Wait — what does ATP actually <em>do</em> inside a cell?
+          Would humans still matter in an AGI-driven economy?
         </div>
       </div>
 
@@ -229,14 +229,14 @@ function ReplyPane() {
           <span>✦</span> NoorAI
         </div>
         <p className="mt-1.5 font-serif text-[0.88rem] leading-relaxed text-echo-text">
-          Think of ATP as a rechargeable battery. When the cell needs to do something — pump ions, move a muscle fiber, build a protein — it spends an ATP, and gets ADP back.
+          Humans may shift from execution toward direction, judgement, and creativity. AGI is excellent at solving stated problems — picking the right problem to solve is still a deeply human act.
         </p>
         <div className="mt-3 flex items-center gap-2">
           <span className="rounded-full border border-echo-border bg-echo-bg/60 px-2 py-0.5 text-[0.65rem] font-medium text-echo-muted">
-            cited · pg 4
+            Page 4
           </span>
           <span className="rounded-full border border-echo-border bg-echo-bg/60 px-2 py-0.5 text-[0.65rem] font-medium text-echo-muted">
-            cited · pg 7
+            Page 7
           </span>
         </div>
       </div>
@@ -247,18 +247,18 @@ function ReplyPane() {
           Concept link
         </div>
         <div className="flex items-center gap-2 text-[0.82rem]">
-          <span className="rounded-md bg-echo-accent px-2 py-1 font-semibold text-echo-bg">ATP</span>
+          <span className="rounded-md bg-echo-accent px-2 py-1 font-semibold text-echo-bg">AGI</span>
           <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 text-echo-muted" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
             <path d="M5 12h14M13 6l6 6-6 6" />
           </svg>
-          <span className="rounded-md border border-echo-border bg-echo-bg px-2 py-1 font-medium text-echo-text">Energy currency</span>
+          <span className="rounded-md border border-echo-border bg-echo-bg px-2 py-1 font-medium text-echo-text">Recursive Self-Improvement</span>
         </div>
         <div className="mt-2 flex items-center gap-2 text-[0.82rem]">
-          <span className="rounded-md border border-echo-border bg-echo-bg px-2 py-1 font-medium text-echo-text">ADP</span>
+          <span className="rounded-md border border-echo-border bg-echo-bg px-2 py-1 font-medium text-echo-text">Copilots</span>
           <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 text-echo-muted" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
             <path d="M5 12h14M13 6l6 6-6 6" />
           </svg>
-          <span className="rounded-md border border-echo-border bg-echo-bg px-2 py-1 font-medium text-echo-text">Recharge</span>
+          <span className="rounded-md border border-echo-border bg-echo-bg px-2 py-1 font-medium text-echo-text">Human Direction</span>
         </div>
       </div>
     </div>
