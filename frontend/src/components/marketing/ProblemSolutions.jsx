@@ -1,4 +1,4 @@
-import { motion, useReducedMotion } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { SectionHeader } from './primitives.jsx'
 
 const PAIRS = [
@@ -51,14 +51,12 @@ const PAIRS = [
 ]
 
 function PairCard({ pair, i }) {
-  const reduce = useReducedMotion()
   return (
     <motion.div
-      initial={reduce ? false : { opacity: 0, y: 24 }}
-      whileInView={reduce ? undefined : { opacity: 1, y: 0 }}
-      animate={reduce ? { opacity: 1, y: 0 } : undefined}
-      viewport={{ once: true, margin: '-60px' }}
-      transition={{ duration: 0.7, delay: i * 0.06, ease: [0.22, 1, 0.36, 1] }}
+      initial={{ opacity: 0, y: 28 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: 0.15, margin: '0px 0px -10% 0px' }}
+      transition={{ duration: 0.7, delay: i * 0.1, ease: [0.22, 1, 0.36, 1] }}
       className="echo-hover-bright group relative overflow-hidden rounded-lg border border-echo-border bg-echo-surface p-1"
     >
       <div className="grid gap-0 sm:grid-cols-[1fr_auto_1fr]">

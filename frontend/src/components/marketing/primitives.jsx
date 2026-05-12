@@ -1,19 +1,45 @@
 import { Children, isValidElement } from 'react'
-import { motion, useReducedMotion } from 'framer-motion'
+import { motion } from 'framer-motion'
 
 /* Reusable motion wrappers for the marketing surface.
    Centralized so every section reveal feels identical and calm. */
 
 export const ease = [0.22, 1, 0.36, 1]
 
-export function FadeUp({ children, delay = 0, y = 18, duration = 0.7, className = '', once = true, viewportMargin = '-80px' }) {
-  const reduce = useReducedMotion()
+/**
+ * FadeUp — slide-up + fade-in reveal triggered when the element enters
+ * the viewport.
+ *
+ * Important: we DON'T short-circuit on `prefers-reduced-motion` here.
+ * The marketing reveals are small (y=24, 0.7s) and core to how the page
+ * communicates "AI workspace". Killing them entirely makes the page feel
+ * broken to users on Windows/macOS who turn reduce-motion on for the OS
+ * but expect web pages to still feel alive. The motion stays subtle.
+ *
+ * Trigger geometry:
+ *   - `amount: 0.15` — fire when ~15% of the element is visible (default
+ *     is "some" which is `1px` and can feel jumpy).
+ *   - `margin: viewportMargin` — defaults to `0px 0px -10% 0px`, meaning
+ *     the bottom edge of the trigger zone is pulled UP by 10% of the
+ *     viewport — animations fire ahead of the element fully arriving.
+ *   - `once: true` — animate the first time only; re-scrolling does not
+ *     re-fire (avoids the "animation loops while doom-scrolling" look).
+ */
+export function FadeUp({
+  children,
+  delay = 0,
+  y = 24,
+  duration = 0.7,
+  className = '',
+  once = true,
+  amount = 0.15,
+  viewportMargin = '0px 0px -10% 0px',
+}) {
   return (
     <motion.div
-      initial={reduce ? false : { opacity: 0, y }}
-      whileInView={reduce ? undefined : { opacity: 1, y: 0 }}
-      animate={reduce ? { opacity: 1, y: 0 } : undefined}
-      viewport={{ once, margin: viewportMargin }}
+      initial={{ opacity: 0, y }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once, amount, margin: viewportMargin }}
       transition={{ duration, delay, ease }}
       className={className}
     >

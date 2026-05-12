@@ -33,8 +33,6 @@ const ANSWER_LINES = [
 ]
 
 export default function RagFlow() {
-  const reduce = useReducedMotion()
-
   return (
     <section id="rag" className="relative px-5 py-32 sm:px-8">
       <div className="mx-auto max-w-7xl">
@@ -63,10 +61,10 @@ export default function RagFlow() {
                 {CHUNKS.map((c, i) => (
                   <motion.li
                     key={c.id}
-                    initial={reduce ? false : { opacity: 0, y: 10 }}
-                    whileInView={reduce ? undefined : { opacity: 1, y: 0 }}
-                    viewport={{ once: true, margin: '-60px' }}
-                    transition={{ duration: 0.5, delay: 0.05 * i, ease: [0.22, 1, 0.36, 1] }}
+                    initial={{ opacity: 0, y: 14 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true, amount: 0.2, margin: '0px 0px -10% 0px' }}
+                    transition={{ duration: 0.5, delay: 0.08 * i, ease: [0.22, 1, 0.36, 1] }}
                     className={[
                       'group relative flex min-w-0 items-center gap-3 rounded-md border bg-echo-bg px-3 py-2.5 transition-colors duration-200',
                       c.retrieved
@@ -118,9 +116,9 @@ export default function RagFlow() {
             <div className="relative">
               <Stamp idx="03" label="Grounded answer" />
               <motion.div
-                initial={reduce ? false : { opacity: 0, y: 12 }}
-                whileInView={reduce ? undefined : { opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: '-60px' }}
+                initial={{ opacity: 0, y: 16 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.2, margin: '0px 0px -10% 0px' }}
                 transition={{ duration: 0.7, delay: 0.4, ease: [0.22, 1, 0.36, 1] }}
                 className="mt-4 rounded-md border border-echo-border bg-echo-bg p-4"
               >
@@ -132,9 +130,9 @@ export default function RagFlow() {
                   {ANSWER_LINES.map((l, i) => (
                     <motion.div
                       key={i}
-                      initial={reduce ? false : { width: 0 }}
-                      whileInView={reduce ? undefined : { width: `${l.w}%` }}
-                      viewport={{ once: true, margin: '-60px' }}
+                      initial={{ width: 0 }}
+                      whileInView={{ width: `${l.w}%` }}
+                      viewport={{ once: true, amount: 0.3, margin: '0px 0px -10% 0px' }}
                       transition={{ duration: 0.6, delay: 0.55 + i * 0.09, ease: [0.22, 1, 0.36, 1] }}
                       className={[
                         'h-2 rounded-full',

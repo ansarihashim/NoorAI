@@ -1,4 +1,4 @@
-import { motion, useReducedMotion } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { SectionHeader } from './primitives.jsx'
 
 const MODES = [
@@ -70,14 +70,12 @@ const MODES = [
 ]
 
 function ModeCard({ mode, i }) {
-  const reduce = useReducedMotion()
   return (
     <motion.div
-      initial={reduce ? false : { opacity: 0, y: 24 }}
-      whileInView={reduce ? undefined : { opacity: 1, y: 0 }}
-      animate={reduce ? { opacity: 1, y: 0 } : undefined}
-      viewport={{ once: true, margin: '-60px' }}
-      transition={{ duration: 0.6, delay: i * 0.06, ease: [0.22, 1, 0.36, 1] }}
+      initial={{ opacity: 0, y: 28 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: 0.2, margin: '0px 0px -10% 0px' }}
+      transition={{ duration: 0.6, delay: i * 0.08, ease: [0.22, 1, 0.36, 1] }}
       className="group relative overflow-hidden rounded-xl border border-echo-border bg-echo-surface p-7 transition-colors duration-150 hover:border-echo-border-strong"
     >
       <div className="flex items-center gap-3">
