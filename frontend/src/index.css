@@ -114,11 +114,29 @@
     scrollbar-width: thin;
     scrollbar-color: rgba(245, 236, 217, 0.10) transparent;
   }
+  /*
+    Reduced-motion accommodations.
+
+    We DO want to stop infinite decorative loops (pulsing dots, breathing
+    glows, the cursor flame) for users who've asked their OS to reduce
+    motion — those are the animations that cause vestibular discomfort.
+
+    We do NOT want to kill scroll-reveal transitions or hover feedback —
+    those are subtle (<800ms, small transforms) and they communicate
+    meaning. Killing them globally was making the whole landing page feel
+    static and broken to users who keep "Reduce motion" on at the OS
+    level by default.
+
+    So: cap iteration count to 1 (no infinite loops) and ignore the
+    transition-duration rule entirely. Elements that opt OUT of even
+    that — short, deliberate, meaning-bearing motion — can carry a
+    `data-allow-motion` attribute (see lib/marketing/primitives.jsx).
+  */
   @media (prefers-reduced-motion: reduce) {
-    *, *::before, *::after {
-      animation-duration: 0.01ms !important;
+    *:not([data-allow-motion]),
+    *:not([data-allow-motion])::before,
+    *:not([data-allow-motion])::after {
       animation-iteration-count: 1 !important;
-      transition-duration: 0.01ms !important;
     }
   }
 }
