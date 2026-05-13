@@ -103,6 +103,33 @@ function Hero() {
   )
 }
 
+/**
+ * SectionReveal — keeps an entire section invisible (opacity 0 + offset +
+ * scaled down) until its top edge crosses into the viewport. Once visible,
+ * fades in and settles into place over ~1s. Only fires the first time a
+ * section enters view; scrolling back up does NOT re-fire.
+ *
+ * Why wrap the whole section (instead of relying on internal FadeUps):
+ * internal FadeUps reveal individual cards/text, but if a section is
+ * partially in view on initial page load (or the user scrolls quickly), the
+ * inner animations can finish before the user actually arrives there — so
+ * sections end up looking "already there" instead of "appearing as I scroll."
+ * Wrapping the section in an outer opacity-0 guarantees nothing inside is
+ * visible until the user reaches it.
+ */
+function SectionReveal({ children, y = 60, amount = 0.08 }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y, scale: 0.97 }}
+      whileInView={{ opacity: 1, y: 0, scale: 1 }}
+      viewport={{ once: true, amount, margin: '0px 0px -5% 0px' }}
+      transition={{ duration: 0.95, ease: [0.22, 1, 0.36, 1] }}
+    >
+      {children}
+    </motion.div>
+  )
+}
+
 export default function Landing() {
   return (
     <div className="relative w-full overflow-x-hidden">
@@ -111,11 +138,11 @@ export default function Landing() {
       <MashaalCursor />
       <MarketingNav />
       <Hero />
-      <StudyModesGrid />
-      <InteractiveDemo />
-      <ProblemSolutions />
-      <RagFlow />
-      <FinalCTA />
+      <SectionReveal><StudyModesGrid /></SectionReveal>
+      <SectionReveal><InteractiveDemo /></SectionReveal>
+      <SectionReveal><ProblemSolutions /></SectionReveal>
+      <SectionReveal><RagFlow /></SectionReveal>
+      <SectionReveal><FinalCTA /></SectionReveal>
       <MarketingFooter />
     </div>
   )
