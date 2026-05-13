@@ -117,13 +117,13 @@ function Hero() {
  * Wrapping the section in an outer opacity-0 guarantees nothing inside is
  * visible until the user reaches it.
  */
-function SectionReveal({ children, y = 60, amount = 0.08 }) {
+function SectionReveal({ children, y = 120, amount = 0.2 }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y, scale: 0.97 }}
-      whileInView={{ opacity: 1, y: 0, scale: 1 }}
-      viewport={{ once: true, amount, margin: '0px 0px -5% 0px' }}
-      transition={{ duration: 0.95, ease: [0.22, 1, 0.36, 1] }}
+      initial={{ opacity: 0, y }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, amount }}
+      transition={{ duration: 1.1, ease: [0.16, 1, 0.3, 1] }}
     >
       {children}
     </motion.div>
