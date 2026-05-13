@@ -106,7 +106,11 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "fullscreen=(self), autoplay=(self)"
         )
         response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
-        response.headers["Cross-Origin-Resource-Policy"] = "same-site"
+        # ``cross-origin`` lets the frontend (Vercel) embed audio MP3s served
+        # from this backend (Render) via <audio> tags. The endpoints
+        # themselves are still gated by JWT auth — CORP only relaxes the
+        # browser's same-site-by-default block on resource embedding.
+        response.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
         if not self._dev:
             response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
         # Don't advertise the stack
