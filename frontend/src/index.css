@@ -373,6 +373,15 @@ html.echo-marketing #root {
   min-height: 100%;
   overflow: visible;
 }
+html.echo-marketing {
+  /* Buttery anchor jumps + programmatic scrollTo on the landing surface.
+     Scoped to marketing so the workspace (which scrolls inside panels)
+     is unaffected. Honour user reduced-motion preference. */
+  scroll-behavior: smooth;
+}
+@media (prefers-reduced-motion: reduce) {
+  html.echo-marketing { scroll-behavior: auto; }
+}
 html.echo-marketing body {
   background: #000000;
   color: #FFFFFF;

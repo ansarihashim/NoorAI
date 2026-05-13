@@ -3,6 +3,7 @@ import { motion, useScroll, useTransform, useReducedMotion } from 'framer-motion
 import MarketingNav from '../components/marketing/MarketingNav.jsx'
 import NotebookBackdrop from '../components/marketing/NotebookBackdrop.jsx'
 import MashaalCursor from '../components/marketing/MashaalCursor.jsx'
+import ScrollProgress from '../components/marketing/ScrollProgress.jsx'
 import BookVisual from '../components/marketing/BookVisual.jsx'
 import StudyModesGrid from '../components/marketing/StudyModesGrid.jsx'
 import InteractiveDemo from '../components/marketing/InteractiveDemo.jsx'
@@ -105,6 +106,7 @@ function Hero() {
 export default function Landing() {
   return (
     <div className="relative w-full overflow-x-hidden">
+      <ScrollProgress />
       <NotebookBackdrop />
       <MashaalCursor />
       <MarketingNav />
