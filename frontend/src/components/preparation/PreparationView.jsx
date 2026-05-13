@@ -21,7 +21,6 @@ const ACTION_TO_TAB = {
   'predict-paper':       'questions',
   'topic-relationships': 'overview',
   'simplify-topic':      'explanation',
-  analogy:               'explanation',
 }
 
 /**

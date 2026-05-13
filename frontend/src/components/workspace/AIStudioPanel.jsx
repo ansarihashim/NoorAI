@@ -27,7 +27,6 @@ const ACTIONS_BY_MODE = {
     ]},
     { group: 'Explain',  items: [
       { id: 'simplify-topic',     label: 'Simplify a topic' },
-      { id: 'analogy',            label: 'Generate an analogy' },
     ]},
   ],
   revision: [

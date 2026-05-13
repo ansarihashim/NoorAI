@@ -22,11 +22,11 @@ export default function ExplanationView({ docIds, action }) {
   const [exp, setExp] = useState(null)
   const [history, setHistory] = useState([])
 
-  // Right-rail "Simplify a topic" / "Generate an analogy" — focus the
-  // input so the user can immediately type what they want explained.
+  // Right-rail "Simplify a topic" — focus the input so the user can
+  // immediately type what they want explained.
   useEffect(() => {
     if (!action) return
-    if (action.action !== 'simplify-topic' && action.action !== 'analogy') return
+    if (action.action !== 'simplify-topic') return
     inputRef.current?.focus()
   }, [action])
 
