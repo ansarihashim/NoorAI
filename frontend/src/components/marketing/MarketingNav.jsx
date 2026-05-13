@@ -1,7 +1,19 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import NoorMark from '../ui/NoorMark.jsx'
+import { disableDemoMode, isDemoModeActiveNow } from '../../config/demo.js'
+
+/** Click handler for "Sign in" / "Get started" in the marketing nav.
+ *  If demo mode is active, force-exits demo on the way to the auth page
+ *  so real credentials are accepted on the other side. */
+function goToRealAuth(destination, navigate) {
+  if (isDemoModeActiveNow()) {
+    disableDemoMode({ redirectTo: destination })
+  } else {
+    navigate(destination)
+  }
+}
 
 const links = [
   { label: 'Features', href: '#study-modes' },
@@ -22,6 +34,7 @@ function NoorLogo({ size = 30 }) {
 export default function MarketingNav() {
   const [scrolled, setScrolled] = useState(false)
   const [open, setOpen] = useState(false)
+  const navigate = useNavigate()
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 18)
@@ -62,14 +75,16 @@ export default function MarketingNav() {
           </nav>
 
           <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-            <Link
-              to="/login"
+            <button
+              type="button"
+              onClick={() => goToRealAuth('/login', navigate)}
               className="hidden rounded-full px-3 py-2 text-[0.88rem] font-medium text-echo-text/85 transition-colors hover:text-echo-accent-soft sm:inline-block"
             >
               Sign in
-            </Link>
-            <Link
-              to="/signup"
+            </button>
+            <button
+              type="button"
+              onClick={() => goToRealAuth('/signup', navigate)}
               className="group inline-flex h-9 items-center gap-1.5 rounded-md bg-echo-accent px-3 text-[0.84rem] font-semibold text-echo-bg transition-colors duration-150 hover:bg-echo-accent-bright active:scale-[0.985] sm:px-4"
             >
               <span>Get started</span>
@@ -84,7 +99,7 @@ export default function MarketingNav() {
               >
                 <path d="M3 8h10M9 4l4 4-4 4" />
               </svg>
-            </Link>
+            </button>
 
             {/* Mobile hamburger */}
             <button
@@ -135,13 +150,13 @@ export default function MarketingNav() {
                 </a>
               ))}
               <div className="mt-2 h-px w-full bg-echo-border" />
-              <Link
-                to="/login"
-                onClick={() => setOpen(false)}
-                className="rounded-lg px-3 py-3 text-[0.95rem] font-medium text-echo-muted hover:text-echo-text"
+              <button
+                type="button"
+                onClick={() => { setOpen(false); goToRealAuth('/login', navigate) }}
+                className="rounded-lg px-3 py-3 text-left text-[0.95rem] font-medium text-echo-muted hover:text-echo-text"
               >
                 Sign in
-              </Link>
+              </button>
             </div>
           </motion.div>
         )}

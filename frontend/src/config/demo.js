@@ -33,7 +33,7 @@ function _readDemoMode() {
 
 export const DEMO_MODE = _readDemoMode()
 
-/** Flip demo mode on for this visitor and reload so every module re-reads
+/** Flip demo mode ON for this visitor and reload so every module re-reads
  *  the flag. Also clears any real-session token so demo doesn't piggyback
  *  on a previous backend login. */
 export function enableDemoMode({ redirectTo = '/app' } = {}) {
@@ -46,14 +46,35 @@ export function enableDemoMode({ redirectTo = '/app' } = {}) {
   }
 }
 
-/** Flip demo mode off and reload back to the landing page. */
+/** Flip demo mode OFF for this visitor and reload.
+ *
+ *  Important: we write the explicit string `'false'` (rather than removing
+ *  the key) so it overrides any `VITE_DEMO_MODE=true` build-time env var.
+ *  If we just removed it, the next `_readDemoMode()` call would fall back
+ *  to the env var and re-enable demo automatically — which is exactly the
+ *  bug that prevented real sign-up after clicking "Exit demo".
+ */
 export function disableDemoMode({ redirectTo = '/' } = {}) {
   try {
-    localStorage.removeItem(DEMO_MODE_LS_KEY)
+    localStorage.setItem(DEMO_MODE_LS_KEY, 'false')
     localStorage.removeItem('echoverse.token')
   } catch { /* ignore */ }
   if (typeof window !== 'undefined') {
     window.location.assign(redirectTo)
+  }
+}
+
+/** True iff the visitor currently has demo mode active in localStorage —
+ *  used by the marketing nav / hero to decide whether the "Sign in" click
+ *  needs a full reload (to flush in-memory `DEMO_MODE`) or can use SPA
+ *  navigation. */
+export function isDemoModeActiveNow() {
+  try {
+    return localStorage.getItem(DEMO_MODE_LS_KEY) === 'true' ||
+      (localStorage.getItem(DEMO_MODE_LS_KEY) === null &&
+       import.meta.env.VITE_DEMO_MODE === 'true')
+  } catch {
+    return import.meta.env.VITE_DEMO_MODE === 'true'
   }
 }
 

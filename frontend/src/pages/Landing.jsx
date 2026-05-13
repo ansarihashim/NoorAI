@@ -1,6 +1,6 @@
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { motion, useScroll, useTransform, useReducedMotion } from 'framer-motion'
-import { enableDemoMode } from '../config/demo.js'
+import { enableDemoMode, disableDemoMode, isDemoModeActiveNow } from '../config/demo.js'
 import MarketingNav from '../components/marketing/MarketingNav.jsx'
 import NotebookBackdrop from '../components/marketing/NotebookBackdrop.jsx'
 import MashaalCursor from '../components/marketing/MashaalCursor.jsx'
@@ -13,8 +13,24 @@ import RagFlow from '../components/marketing/RagFlow.jsx'
 import FinalCTA from '../components/marketing/FinalCTA.jsx'
 import MarketingFooter from '../components/marketing/MarketingFooter.jsx'
 
+/**
+ * Click handler for "Start studying" / "Sign in" / "Get started" CTAs.
+ * If demo mode is currently active, force-exits demo (writes `'false'`
+ * to localStorage and reloads to the destination so every module
+ * re-evaluates `DEMO_MODE`). Otherwise navigates normally via React
+ * Router. This is the firewall between demo and real-auth flows.
+ */
+function goToRealAuth(destination, navigate) {
+  if (isDemoModeActiveNow()) {
+    disableDemoMode({ redirectTo: destination })
+  } else {
+    navigate(destination)
+  }
+}
+
 function Hero() {
   const reduce = useReducedMotion()
+  const navigate = useNavigate()
   // Page-scroll-driven parallax. The earlier `useScroll({ target, offset })`
   // form triggered a framer-motion "container has a static position" warning
   // because the offset-parent chain in marketing mode includes static
@@ -71,21 +87,23 @@ function Hero() {
               transition={{ duration: 0.8, delay: 0.28, ease: [0.22, 1, 0.36, 1] }}
               className="mt-8 flex flex-col items-stretch gap-3 sm:mt-10 sm:flex-row sm:flex-wrap sm:items-center"
             >
-              <Link
-                to="/signup"
+              <button
+                type="button"
+                onClick={() => goToRealAuth('/signup', navigate)}
                 className="group inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-echo-accent px-6 text-[0.92rem] font-semibold text-echo-bg transition-colors duration-150 hover:bg-echo-accent-bright active:scale-[0.985]"
               >
                 <span>Start studying</span>
                 <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 transition-transform duration-150 group-hover:translate-x-0.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M3 8h10M9 4l4 4-4 4" />
                 </svg>
-              </Link>
-              <Link
-                to="/login"
+              </button>
+              <button
+                type="button"
+                onClick={() => goToRealAuth('/login', navigate)}
                 className="inline-flex h-11 items-center justify-center rounded-lg border border-echo-border bg-transparent px-5 text-[0.9rem] font-medium text-echo-text transition-colors duration-150 hover:border-echo-border-strong hover:bg-echo-surface"
               >
                 Sign in
-              </Link>
+              </button>
               <button
                 type="button"
                 onClick={() => enableDemoMode()}

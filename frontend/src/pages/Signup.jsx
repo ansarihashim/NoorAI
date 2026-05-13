@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import { useAuth } from '../lib/auth.jsx'
 import { useToast } from '../components/ui/Toast.jsx'
 import { useSound } from '../lib/sound.jsx'
+import { DEMO_MODE, disableDemoMode } from '../config/demo.js'
 import NoorMark from '../components/ui/NoorMark.jsx'
 import {
   NotebookPage,
@@ -162,6 +163,27 @@ export default function Signup() {
             <p className="mt-1.5 text-[0.9rem] text-ink-muted">
               Sixty seconds. Bring a PDF and start listening.
             </p>
+
+            {DEMO_MODE && (
+              <div className="mt-5 rounded-lg border border-accent/30 bg-accent-soft/30 px-3.5 py-3 text-[0.78rem] leading-snug text-ink-muted">
+                <div className="flex items-center gap-2">
+                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-accent animate-breathe" />
+                  <span className="text-[0.66rem] font-medium uppercase tracking-[0.14em] text-accent">
+                    Demo workspace is active
+                  </span>
+                </div>
+                <p className="mt-1.5">
+                  Real signups need demo mode off. Click below to exit demo and unlock real account creation.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => disableDemoMode({ redirectTo: '/signup' })}
+                  className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-rule px-2.5 py-1 text-[0.76rem] font-medium text-ink-muted transition-colors hover:border-rule-strong hover:text-ink"
+                >
+                  Exit demo and continue →
+                </button>
+              </div>
+            )}
 
             <form onSubmit={onSubmit} className="mt-7 space-y-5">
               <FormField

@@ -10,7 +10,7 @@ import {
   NotebookEyebrow,
   NotebookDisplay,
 } from '../components/ui/NotebookSurface.jsx'
-import { DEMO_MODE, DEMO_CREDENTIALS } from '../config/demo.js'
+import { DEMO_MODE, DEMO_CREDENTIALS, disableDemoMode } from '../config/demo.js'
 
 /**
  * Login is rendered as a notebook spread:
@@ -261,16 +261,28 @@ function DemoHint({ onUse }) {
         and{' '}
         <code className="rounded bg-page/60 px-1 font-mono text-ink">{DEMO_CREDENTIALS.password}</code>.
       </p>
-      <button
-        type="button"
-        onClick={() => onUse?.(DEMO_CREDENTIALS.email, DEMO_CREDENTIALS.password)}
-        className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-accent/40 bg-page/40 px-2.5 py-1 text-[0.76rem] font-medium text-ink transition-colors hover:bg-page/70"
-      >
-        <svg viewBox="0 0 16 16" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M3 8h10M9 4l4 4-4 4" />
-        </svg>
-        Prefill demo credentials
-      </button>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => onUse?.(DEMO_CREDENTIALS.email, DEMO_CREDENTIALS.password)}
+          className="inline-flex items-center gap-1.5 rounded-md border border-accent/40 bg-page/40 px-2.5 py-1 text-[0.76rem] font-medium text-ink transition-colors hover:bg-page/70"
+        >
+          <svg viewBox="0 0 16 16" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 8h10M9 4l4 4-4 4" />
+          </svg>
+          Prefill demo credentials
+        </button>
+        <button
+          type="button"
+          onClick={() => disableDemoMode({ redirectTo: '/login' })}
+          className="inline-flex items-center gap-1.5 rounded-md border border-rule px-2.5 py-1 text-[0.76rem] font-medium text-ink-muted transition-colors hover:border-rule-strong hover:text-ink"
+        >
+          Use my own credentials →
+        </button>
+      </div>
+      <p className="mt-2 text-[0.7rem] leading-snug text-ink-faint">
+        Real signups require demo mode to be off. Click <span className="text-ink-muted">Use my own credentials</span> to exit demo and unlock real sign-up.
+      </p>
     </div>
   )
 }
