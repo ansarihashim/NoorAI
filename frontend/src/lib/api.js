@@ -68,9 +68,26 @@ export function isTokenExpired(token) {
   return payload.exp * 1000 < Date.now() - 10_000
 }
 
+/**
+ * Auth-token storage policy:
+ *
+ *   - The JWT lives in **sessionStorage** (not localStorage). That means
+ *     the session is scoped to the browser process: closing the browser,
+ *     restarting the PC, or opening the app in a separate browser
+ *     instance all start with no token → forced re-login. This is the
+ *     intended UX for a study tool where users may share a PC.
+ *
+ *   - Multiple tabs of the same site DON'T share sessionStorage by
+ *     default (it's per-tab). We accept that — opening the app in a new
+ *     tab requires logging in there. It's the price of "log in once,
+ *     scoped to this tab/window only".
+ *
+ *   - The token's `exp` claim still applies on top (currently 4h server
+ *     side). sessionStorage scoping is a defence-in-depth layer.
+ */
 export function getToken() {
   try {
-    const raw = localStorage.getItem(TOKEN_KEY)
+    const raw = sessionStorage.getItem(TOKEN_KEY)
     if (!raw) return null
     if (isTokenExpired(raw)) {
       // Token has aged out client-side — drop it before returning.
@@ -85,8 +102,8 @@ export function getToken() {
 
 export function setToken(token) {
   try {
-    if (token) localStorage.setItem(TOKEN_KEY, token)
-    else localStorage.removeItem(TOKEN_KEY)
+    if (token) sessionStorage.setItem(TOKEN_KEY, token)
+    else sessionStorage.removeItem(TOKEN_KEY)
   } catch {
     /* no-op */
   }
@@ -95,6 +112,8 @@ export function setToken(token) {
 /** Wipe every per-user key. Called on logout and on 401. */
 export function clearAuthStorage() {
   try {
+    // Token lives in sessionStorage (see getToken/setToken).
+    sessionStorage.removeItem(TOKEN_KEY)
     for (const key of USER_SCOPED_KEYS) localStorage.removeItem(key)
     // Wipe any per-doc bookmark namespaces too (echoverse.bookmarks.*).
     for (let i = localStorage.length - 1; i >= 0; i--) {

@@ -49,12 +49,10 @@ const ACTIONS_BY_MODE = {
     ]},
   ],
   narration: [],
-  // Fallback when no doc / mode is active.
-  null: [
-    { group: 'Get started', items: [
-      { id: 'upload',             label: 'Upload a source' },
-    ]},
-  ],
+  // Fallback when no doc / mode is active. No shortcut buttons —
+  // uploads happen from the WorkspaceHome page at /app, not from
+  // the AI Studio rail.
+  null: [],
 }
 
 export default function AIStudioPanel({ mode }) {
@@ -62,7 +60,7 @@ export default function AIStudioPanel({ mode }) {
   const location = useLocation()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
-  const { activeScope, openUploadDialog } = useWorkspace()
+  const { activeScope } = useWorkspace()
   const { play } = useSound()
 
   const docId = params.docId
@@ -72,10 +70,6 @@ export default function AIStudioPanel({ mode }) {
 
   function runAction(actionId) {
     play('tap')
-    if (actionId === 'upload') {
-      openUploadDialog()
-      return
-    }
     // Mode views opt in by reading ?action=...
     const next = new URLSearchParams(searchParams)
     next.set('action', actionId)

@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Outlet, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { WorkspaceProvider, useWorkspace } from './WorkspaceContext.jsx'
 import { PodcastSessionProvider } from './PodcastSessionContext.jsx'
@@ -7,8 +7,6 @@ import WorkspaceTopBar from './WorkspaceTopBar.jsx'
 import SourcesPanel from './SourcesPanel.jsx'
 import AIStudioPanel from './AIStudioPanel.jsx'
 import PodcastTranscriptPanel from './PodcastTranscriptPanel.jsx'
-import UploadCard from '../dashboard/UploadCard.jsx'
-import Dialog from '../ui/Dialog.jsx'
 import useMediaQuery, { BP } from '../../hooks/useMediaQuery.js'
 
 /**
@@ -40,35 +38,7 @@ function ShellRoot() {
     <div className="flex h-[100dvh] flex-col bg-page text-ink">
       <WorkspaceTopBar />
       <ShellBody />
-      <UploadDialogMount />
     </div>
-  )
-}
-
-/**
- * Shell-level upload dialog. Rendered once at the top of the workspace so
- * both rails can trigger it via `openUploadDialog()` from the workspace
- * context. On successful upload we close the dialog, refresh the docs
- * list, and navigate the user into the new session.
- */
-function UploadDialogMount() {
-  const { uploadDialogOpen, closeUploadDialog, refreshDocs } = useWorkspace()
-  const navigate = useNavigate()
-  function onUploaded(res) {
-    closeUploadDialog()
-    refreshDocs()
-    if (res?.doc_id) navigate(`/app/session/${res.doc_id}`)
-  }
-  return (
-    <Dialog
-      open={uploadDialogOpen}
-      onClose={closeUploadDialog}
-      title="Upload a source"
-      description="Drop a PDF or paste text. The page will be indexed for narration, revision, and Q&A."
-      maxWidth="max-w-xl"
-    >
-      <UploadCard onUploaded={onUploaded} />
-    </Dialog>
   )
 }
 

@@ -39,7 +39,8 @@ export const DEMO_MODE = _readDemoMode()
 export function enableDemoMode({ redirectTo = '/app' } = {}) {
   try {
     localStorage.setItem(DEMO_MODE_LS_KEY, 'true')
-    localStorage.removeItem('echoverse.token')
+    // Auth token lives in sessionStorage now (see api.js getToken/setToken).
+    sessionStorage.removeItem('echoverse.token')
   } catch { /* ignore */ }
   if (typeof window !== 'undefined') {
     window.location.assign(redirectTo)
@@ -57,7 +58,8 @@ export function enableDemoMode({ redirectTo = '/app' } = {}) {
 export function disableDemoMode({ redirectTo = '/' } = {}) {
   try {
     localStorage.setItem(DEMO_MODE_LS_KEY, 'false')
-    localStorage.removeItem('echoverse.token')
+    // Auth token lives in sessionStorage now (see api.js getToken/setToken).
+    sessionStorage.removeItem('echoverse.token')
   } catch { /* ignore */ }
   if (typeof window !== 'undefined') {
     window.location.assign(redirectTo)

@@ -9,7 +9,7 @@ import { useSound } from '../../lib/sound.jsx'
  * amber active treatment via a thin left bar + tinted bg + bright text.
  */
 export default function SourcesPanel() {
-  const { docs, activeScope, toggleSource, openUploadDialog } = useWorkspace()
+  const { docs, activeScope, toggleSource } = useWorkspace()
   const { play } = useSound()
   const params = useParams()
   const navigate = useNavigate()
@@ -29,26 +29,13 @@ export default function SourcesPanel() {
     <div className="flex h-full flex-col">
       {/* Header — framed as a notebook index, not a generic file list */}
       <div className="border-b border-rule px-4 pb-3 pt-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <span className="block text-[0.6rem] font-mono font-semibold uppercase tracking-[0.18em] text-accent">
-              Notebook
-            </span>
-            <span className="mt-0.5 block font-serif text-[0.92rem] font-semibold text-ink">
-              Index
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={() => { play('tap'); openUploadDialog() }}
-            className="inline-flex h-7 w-7 items-center justify-center rounded-md text-ink-dim transition-colors duration-150 hover:bg-elevated hover:text-ink"
-            title="Add a page"
-            aria-label="Add a page"
-          >
-            <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 5v14M5 12h14" />
-            </svg>
-          </button>
+        <div>
+          <span className="block text-[0.6rem] font-mono font-semibold uppercase tracking-[0.18em] text-accent">
+            Notebook
+          </span>
+          <span className="mt-0.5 block font-serif text-[0.92rem] font-semibold text-ink">
+            Index
+          </span>
         </div>
         <p className="mt-1 text-[0.7rem] leading-snug text-ink-dim">
           Pages of your study notebook · check to add to scope.
@@ -109,13 +96,13 @@ export default function SourcesPanel() {
         {docs !== null && docs.length === 0 && (
           <li className="px-4 py-8 text-center">
             <p className="text-[0.82rem] text-ink-muted">Notebook is blank.</p>
-            <button
-              type="button"
-              onClick={() => { play('tap'); openUploadDialog() }}
+            <Link
+              to="/app"
+              onClick={() => play('tap')}
               className="mt-3 inline-block text-[0.82rem] font-medium text-accent transition-colors hover:text-accent-soft"
             >
               Add the first page
-            </button>
+            </Link>
           </li>
         )}
         {filtered && filtered.length === 0 && docs?.length > 0 && (

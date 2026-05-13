@@ -32,13 +32,6 @@ export function WorkspaceProvider({ children }) {
   // Held here (not in Session) so AIStudioPanel + ModeRail + Session all
   // agree on which cognitive mode is active without re-render storms.
   const [activeMode, setActiveMode] = useState('preparation')
-  // Upload dialog — opened from the "+" button in SourcesPanel and from
-  // the "Upload a source" action in AIStudioPanel. Held at this level so
-  // both rails can trigger the same modal regardless of which page the
-  // user is on.
-  const [uploadDialogOpen, setUploadDialogOpen] = useState(false)
-  const openUploadDialog = useCallback(() => setUploadDialogOpen(true), [])
-  const closeUploadDialog = useCallback(() => setUploadDialogOpen(false), [])
 
   // Load docs once at shell mount; refresh exposed for upload completion.
   const refreshDocs = useCallback(async () => {
@@ -80,10 +73,8 @@ export function WorkspaceProvider({ children }) {
     sourcesCollapsed, setSourcesCollapsed,
     studioCollapsed, setStudioCollapsed,
     activeMode, setActiveMode,
-    uploadDialogOpen, openUploadDialog, closeUploadDialog,
   }), [docs, docsError, refreshDocs, activeScope, toggleSource, setSourceActive,
-       sourcesCollapsed, studioCollapsed, activeMode,
-       uploadDialogOpen, openUploadDialog, closeUploadDialog])
+       sourcesCollapsed, studioCollapsed, activeMode])
 
   return <WorkspaceCtx.Provider value={value}>{children}</WorkspaceCtx.Provider>
 }
