@@ -59,10 +59,12 @@ logger = logging.getLogger(__name__)
 # changes, the Pinecone index must be recreated with the matching dim.
 EMBED_DIM = 384
 
-# HF Inference API endpoint for sentence-transformer feature extraction.
-# The /pipeline/feature-extraction/ route returns sentence-level embeddings
-# directly (not token-level), so we don't need to mean-pool.
-_HF_BASE_URL = "https://api-inference.huggingface.co/pipeline/feature-extraction"
+# HF Inference Providers router for sentence-transformer feature extraction.
+# The legacy api-inference.huggingface.co/pipeline/feature-extraction/...
+# endpoint returns 404 — HF migrated to the provider-routed URL pattern
+# `router.huggingface.co/<provider>/models/<model>/pipeline/feature-extraction`.
+# We pin the provider to ``hf-inference`` (HF's own free tier).
+_HF_BASE_URL = "https://router.huggingface.co/hf-inference/models"
 
 # Max texts per HF request. Bounds payload size + retry cost.
 _HF_BATCH_SIZE = 64
@@ -624,7 +626,7 @@ class RagService:
         On 503 ("model is loading") we retry once with ``wait_for_model`` so
         the first cold call after deploy doesn't fail spuriously.
         """
-        url = f"{_HF_BASE_URL}/{self._embed_model}"
+        url = f"{_HF_BASE_URL}/{self._embed_model}/pipeline/feature-extraction"
         client = self._hf_client()
         payload: dict = {"inputs": batch, "options": {"wait_for_model": True}}
 
