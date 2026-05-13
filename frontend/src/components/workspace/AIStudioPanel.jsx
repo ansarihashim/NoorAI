@@ -62,7 +62,7 @@ export default function AIStudioPanel({ mode }) {
   const location = useLocation()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
-  const { activeScope } = useWorkspace()
+  const { activeScope, openUploadDialog } = useWorkspace()
   const { play } = useSound()
 
   const docId = params.docId
@@ -73,7 +73,7 @@ export default function AIStudioPanel({ mode }) {
   function runAction(actionId) {
     play('tap')
     if (actionId === 'upload') {
-      navigate('/app')
+      openUploadDialog()
       return
     }
     // Mode views opt in by reading ?action=...

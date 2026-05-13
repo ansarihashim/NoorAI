@@ -37,7 +37,7 @@ export default function ReadingPane({ chunks, currentIdx, totalChunks, state, ha
             Ready when you are.
           </h2>
           <p className="mx-auto mt-2 max-w-sm font-serif text-[0.95rem] leading-relaxed text-ink-muted">
-            Press <span className="rounded-sm border border-rule bg-elevated px-1.5 py-0.5 font-mono text-[0.7rem]">Play</span> below to begin reading. Click <span className="text-accent">Ask a doubt</span> any time to pause and ask a question — reading resumes automatically.
+            Press <span className="rounded-sm border border-rule bg-elevated px-1.5 py-0.5 font-mono text-[0.7rem]">Play</span> below to begin reading. Use the chapters list to jump to any paragraph, or seek freely with the bar.
           </p>
         </div>
       </div>

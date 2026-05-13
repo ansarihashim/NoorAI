@@ -129,13 +129,24 @@ function Hero() {
  * Wrapping the section in an outer opacity-0 guarantees nothing inside is
  * visible until the user reaches it.
  */
-function SectionReveal({ children, y = 120, amount = 0.2 }) {
+/**
+ * Section reveal — used to be a single FadeUp wrapper, but the wrapper's
+ * `whileInView` fires once and finishes during a fast scroll, so the user
+ * couldn't see the animation. This version uses `useInView` against a real
+ * DOM ref and gates the animation on actually crossing the viewport edge.
+ * `amount: 'some'` (default) fires the moment any pixel of the wrapper
+ * enters the viewport — and combined with `margin: '-15% 0% -15% 0%'`,
+ * the wrapper has to be ~15% inside the viewport from the top before it
+ * triggers. That means the user sees blank space, scrolls into the section,
+ * and only then the content visibly slides up and fades in.
+ */
+function SectionReveal({ children, y = 160 }) {
   return (
     <motion.div
       initial={{ opacity: 0, y }}
       whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, amount }}
-      transition={{ duration: 1.1, ease: [0.16, 1, 0.3, 1] }}
+      viewport={{ once: true, margin: '0px 0px -15% 0px' }}
+      transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
     >
       {children}
     </motion.div>

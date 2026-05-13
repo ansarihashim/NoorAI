@@ -9,7 +9,7 @@ import { useSound } from '../../lib/sound.jsx'
  * amber active treatment via a thin left bar + tinted bg + bright text.
  */
 export default function SourcesPanel() {
-  const { docs, activeScope, toggleSource } = useWorkspace()
+  const { docs, activeScope, toggleSource, openUploadDialog } = useWorkspace()
   const { play } = useSound()
   const params = useParams()
   const navigate = useNavigate()
@@ -38,9 +38,9 @@ export default function SourcesPanel() {
               Index
             </span>
           </div>
-          <Link
-            to="/app"
-            onClick={() => play('tap')}
+          <button
+            type="button"
+            onClick={() => { play('tap'); openUploadDialog() }}
             className="inline-flex h-7 w-7 items-center justify-center rounded-md text-ink-dim transition-colors duration-150 hover:bg-elevated hover:text-ink"
             title="Add a page"
             aria-label="Add a page"
@@ -48,7 +48,7 @@ export default function SourcesPanel() {
             <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 5v14M5 12h14" />
             </svg>
-          </Link>
+          </button>
         </div>
         <p className="mt-1 text-[0.7rem] leading-snug text-ink-dim">
           Pages of your study notebook · check to add to scope.
@@ -109,13 +109,13 @@ export default function SourcesPanel() {
         {docs !== null && docs.length === 0 && (
           <li className="px-4 py-8 text-center">
             <p className="text-[0.82rem] text-ink-muted">Notebook is blank.</p>
-            <Link
-              to="/app"
-              onClick={() => play('tap')}
+            <button
+              type="button"
+              onClick={() => { play('tap'); openUploadDialog() }}
               className="mt-3 inline-block text-[0.82rem] font-medium text-accent transition-colors hover:text-accent-soft"
             >
               Add the first page
-            </Link>
+            </button>
           </li>
         )}
         {filtered && filtered.length === 0 && docs?.length > 0 && (
