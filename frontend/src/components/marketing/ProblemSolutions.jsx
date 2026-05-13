@@ -53,10 +53,10 @@ const PAIRS = [
 function PairCard({ pair, i }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 28 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, amount: 0.15, margin: '0px 0px -10% 0px' }}
-      transition={{ duration: 0.7, delay: i * 0.1, ease: [0.22, 1, 0.36, 1] }}
+      initial={{ opacity: 0, y: 44, scale: 0.96 }}
+      whileInView={{ opacity: 1, y: 0, scale: 1 }}
+      viewport={{ once: true, amount: 0.15, margin: '0px 0px -8% 0px' }}
+      transition={{ duration: 0.85, delay: i * 0.12, ease: [0.22, 1, 0.36, 1] }}
       className="echo-hover-bright group relative overflow-hidden rounded-lg border border-echo-border bg-echo-surface p-1"
     >
       <div className="grid gap-0 sm:grid-cols-[1fr_auto_1fr]">

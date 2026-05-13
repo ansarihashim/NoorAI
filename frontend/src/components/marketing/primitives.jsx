@@ -28,17 +28,18 @@ export const ease = [0.22, 1, 0.36, 1]
 export function FadeUp({
   children,
   delay = 0,
-  y = 24,
-  duration = 0.7,
+  y = 44,
+  duration = 0.85,
+  scaleFrom = 0.96,
   className = '',
   once = true,
   amount = 0.15,
-  viewportMargin = '0px 0px -10% 0px',
+  viewportMargin = '0px 0px -8% 0px',
 }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y }}
-      whileInView={{ opacity: 1, y: 0 }}
+      initial={{ opacity: 0, y, scale: scaleFrom }}
+      whileInView={{ opacity: 1, y: 0, scale: 1 }}
       viewport={{ once, amount, margin: viewportMargin }}
       transition={{ duration, delay, ease }}
       className={className}
@@ -65,10 +66,10 @@ export function FadeUp({
  */
 export function StaggerGroup({
   children,
-  stagger = 0.08,
+  stagger = 0.1,
   initialDelay = 0,
-  y = 20,
-  duration = 0.65,
+  y = 36,
+  duration = 0.75,
   className = '',
   as: As = 'div',
 }) {
