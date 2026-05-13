@@ -1,18 +1,61 @@
 /**
  * Demo Mode central config.
  *
- * When `VITE_DEMO_MODE === "true"` the frontend pulls all AI answers,
- * narrations, podcasts, visuals and revision sets from local cached data
- * under `src/demo/`. No requests hit Groq / ElevenLabs / Whisper / the
- * RAG service. The UI behaves identically to the real product — same
- * loading stages, same streaming feel — so a recruiter or interviewer
- * cannot tell the experience apart from the live system.
+ * When demo mode is on, the frontend pulls all AI answers, narrations,
+ * podcasts, visuals and revision sets from local cached data under
+ * `src/demo/`. No requests hit Groq / ElevenLabs / the RAG service.
+ * The UI behaves identically to the real product so a recruiter or
+ * interviewer cannot tell the experience apart from the live system.
  *
- * Toggling:
- *   - Production (Vercel): set VITE_DEMO_MODE=true in the Vercel env panel.
- *   - Local dev against the real backend: leave it `false` / unset.
+ * Toggle priority (checked in order):
+ *   1. localStorage key `noorai.demoMode` ("true" / "false")
+ *        Set by the "Try the demo" button on the landing page (runtime,
+ *        per-visitor — no redeploy needed).
+ *   2. Build-time `VITE_DEMO_MODE=true` (fallback for portfolio deploys
+ *        where every visitor should see demo by default).
+ *
+ * The constant is captured at module load — toggling requires a full
+ * page reload so every importer sees the fresh value. The helper
+ * functions below trigger that reload for you.
  */
-export const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true'
+const DEMO_MODE_LS_KEY = 'noorai.demoMode'
+
+function _readDemoMode() {
+  try {
+    const ls = typeof localStorage !== 'undefined'
+      ? localStorage.getItem(DEMO_MODE_LS_KEY)
+      : null
+    if (ls === 'true') return true
+    if (ls === 'false') return false
+  } catch { /* localStorage unavailable (SSR, private mode quotas) — fall through */ }
+  return import.meta.env.VITE_DEMO_MODE === 'true'
+}
+
+export const DEMO_MODE = _readDemoMode()
+
+/** Flip demo mode on for this visitor and reload so every module re-reads
+ *  the flag. Also clears any real-session token so demo doesn't piggyback
+ *  on a previous backend login. */
+export function enableDemoMode({ redirectTo = '/app' } = {}) {
+  try {
+    localStorage.setItem(DEMO_MODE_LS_KEY, 'true')
+    localStorage.removeItem('echoverse.token')
+  } catch { /* ignore */ }
+  if (typeof window !== 'undefined') {
+    window.location.assign(redirectTo)
+  }
+}
+
+/** Flip demo mode off and reload back to the landing page. */
+export function disableDemoMode({ redirectTo = '/' } = {}) {
+  try {
+    localStorage.removeItem(DEMO_MODE_LS_KEY)
+    localStorage.removeItem('echoverse.token')
+  } catch { /* ignore */ }
+  if (typeof window !== 'undefined') {
+    window.location.assign(redirectTo)
+  }
+}
 
 /** Stable email/password we accept in demo mode. */
 export const DEMO_CREDENTIALS = Object.freeze({

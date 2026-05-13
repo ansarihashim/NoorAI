@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { motion, useScroll, useTransform, useReducedMotion } from 'framer-motion'
+import { enableDemoMode } from '../config/demo.js'
 import MarketingNav from '../components/marketing/MarketingNav.jsx'
 import NotebookBackdrop from '../components/marketing/NotebookBackdrop.jsx'
 import MashaalCursor from '../components/marketing/MashaalCursor.jsx'
@@ -85,6 +86,17 @@ function Hero() {
               >
                 Sign in
               </Link>
+              <button
+                type="button"
+                onClick={() => enableDemoMode()}
+                className="group inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-echo-accent/40 bg-echo-accent/[0.08] px-5 text-[0.9rem] font-medium text-echo-accent transition-colors duration-150 hover:bg-echo-accent/[0.14] hover:border-echo-accent/60"
+              >
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-echo-accent" />
+                <span>Try the demo</span>
+                <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 transition-transform duration-150 group-hover:translate-x-0.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 8h10M9 4l4 4-4 4" />
+                </svg>
+              </button>
             </motion.div>
           </motion.div>
 
