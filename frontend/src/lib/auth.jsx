@@ -1,21 +1,24 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import * as api from './api.js'
+import { DEMO_MODE } from '../config/demo.js'
 
 const AuthCtx = createContext(null)
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
-  // We start in `hydrating=true` only when a non-expired token is present.
-  // `api.getToken()` already drops expired tokens, so this stays correct
-  // across PC restarts: an expired token => no hydration, straight to logged-out.
-  const [hydrating, setHydrating] = useState(() => Boolean(api.getToken()))
+  // Hydration runs whenever there's either a real token OR demo mode is on
+  // (because the demo `me()` call mints a token on the fly, so the absence
+  // of a token in sessionStorage is normal at first paint after clicking
+  // "Try the demo"). Without this carve-out, the demo auto-login flow
+  // bails out before `me()` is called and the user lands on /login.
+  const [hydrating, setHydrating] = useState(() => Boolean(api.getToken()) || DEMO_MODE)
 
   // On mount: if a (still valid) token exists, validate it by fetching /me.
   useEffect(() => {
     let cancelled = false
     async function hydrate() {
       const token = api.getToken()
-      if (!token) {
+      if (!token && !DEMO_MODE) {
         setHydrating(false)
         return
       }
