@@ -1,5 +1,6 @@
+import { useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { motion, useScroll, useTransform, useReducedMotion } from 'framer-motion'
+import { motion, useScroll, useSpring, useTransform, useReducedMotion } from 'framer-motion'
 import { enableDemoMode, disableDemoMode, isDemoModeActiveNow } from '../config/demo.js'
 import MarketingNav from '../components/marketing/MarketingNav.jsx'
 import NotebookBackdrop from '../components/marketing/NotebookBackdrop.jsx'
@@ -148,24 +149,42 @@ function Hero() {
  * visible until the user reaches it.
  */
 /**
- * Section reveal — used to be a single FadeUp wrapper, but the wrapper's
- * `whileInView` fires once and finishes during a fast scroll, so the user
- * couldn't see the animation. This version uses `useInView` against a real
- * DOM ref and gates the animation on actually crossing the viewport edge.
- * `amount: 'some'` (default) fires the moment any pixel of the wrapper
- * enters the viewport — and combined with `margin: '-15% 0% -15% 0%'`,
- * the wrapper has to be ~15% inside the viewport from the top before it
- * triggers. That means the user sees blank space, scrolls into the section,
- * and only then the content visibly slides up and fades in.
+ * Section reveal — SCROLL-POSITION DRIVEN.
+ *
+ * Why not `whileInView` / `useInView`?
+ *   Those fire once on viewport entry and run on their own clock (a 1s
+ *   duration animation). During a normal scroll the animation finishes
+ *   before the user actually focuses on the section, so the section
+ *   appears already "settled" — exactly the bug being reported.
+ *
+ * Instead, this hook drives opacity and y-translation directly from the
+ * scroll progress of the section's own bounding box:
+ *
+ *   - When the section's TOP is at the viewport's BOTTOM     → progress 0.
+ *     (Section is just about to enter. opacity 0, y +200px.)
+ *   - When the section's TOP is at 35% from the viewport TOP → progress 1.
+ *     (Section is now well into view. opacity 1, y 0.)
+ *
+ * So as the user scrolls, the section visibly slides up and fades in in
+ * lockstep with the scroll — the animation IS the scroll. Smoothed by a
+ * spring so wheel-tick jitter doesn't translate into twitching content.
  */
-function SectionReveal({ children, y = 160 }) {
+function SectionReveal({ children }) {
+  const ref = useRef(null)
+  const { scrollYProgress } = useScroll({
+    target: ref,
+    offset: ['start end', 'start 35%'],
+  })
+  const smooth = useSpring(scrollYProgress, {
+    stiffness: 110,
+    damping: 30,
+    mass: 0.5,
+    restDelta: 0.001,
+  })
+  const opacity = useTransform(smooth, [0, 0.4, 1], [0, 0.2, 1])
+  const y = useTransform(smooth, [0, 1], [200, 0])
   return (
-    <motion.div
-      initial={{ opacity: 0, y }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: '0px 0px -15% 0px' }}
-      transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
-    >
+    <motion.div ref={ref} style={{ opacity, y, position: 'relative' }}>
       {children}
     </motion.div>
   )
