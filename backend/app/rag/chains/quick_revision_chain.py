@@ -11,7 +11,7 @@ from app.rag.retriever import (
     docs_to_numbered_context,
 )
 from app.core.settings import get_settings
-from app.rag.prompts.quick_revision import QUICK_REVISION_PROMPT
+from app.rag.prompts.quick_revision import QUICK_REVISION_PROMPT, QUICK_REVISION_STREAM_PROMPT
 from app.rag.schemas.revision import QuickRevisionSet
 
 
@@ -47,4 +47,35 @@ def build_quick_revision_chain(doc_id: str) -> Runnable:
     ).with_config({"run_name": "quick_revision_generation"})
 
 
-__all__ = ["build_quick_revision_chain"]
+def build_quick_revision_stream_chain(doc_id: str) -> Runnable:
+    """Streaming (JSONL) quick-revision chain — one JSON topic per line, no
+    structured output. Drive with
+    ``astream_jsonl_items(chain, {"max_topics", "title"}, QuickRevisionTopic)``."""
+    retriever = EchoVerseRetriever(doc_id=doc_id, k=8)
+
+    def _build_context(_: dict[str, Any]) -> str:
+        return docs_to_numbered_context(retriever.fetch_all())
+
+    s = get_settings()
+    llm = ChatGroq(
+        model=s.groq_model,
+        api_key=s.groq_api_key,
+        temperature=0.3,
+        max_tokens=2400,
+        streaming=True,
+    )
+    return (
+        RunnablePassthrough.assign(context=RunnableLambda(_build_context))
+        | RunnableLambda(
+            lambda x: {
+                "context": x["context"],
+                "max_topics": x["max_topics"],
+                "title": x["title"],
+            }
+        )
+        | QUICK_REVISION_STREAM_PROMPT
+        | llm
+    ).with_config({"run_name": "quick_revision_stream"})
+
+
+__all__ = ["build_quick_revision_chain", "build_quick_revision_stream_chain"]

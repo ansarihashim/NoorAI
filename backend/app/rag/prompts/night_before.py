@@ -1,7 +1,7 @@
 """Prompt template for the night-before-exam chain."""
 from langchain_core.prompts import ChatPromptTemplate
 
-from app.rag.prompts.system import GROUNDED_SYSTEM
+from app.rag.prompts.system import GROUNDED_SYSTEM, GROUNDED_SYSTEM_STREAM
 
 _TASK = """Build a "NIGHT BEFORE THE EXAM" cheat sheet for the document titled: {title}
 
@@ -45,4 +45,22 @@ Return a single JSON object matching the NightBeforeSet schema."""
 NIGHT_BEFORE_PROMPT = ChatPromptTemplate.from_messages([
     ("system", GROUNDED_SYSTEM),
     ("user", _TASK),
+])
+
+
+# --- Streaming (JSONL) variant -------------------------------------------------
+_STREAM_FOOTER = """STREAMING OUTPUT (read carefully):
+- Emit each cheat-sheet item as a SEPARATE JSON object on its OWN line (JSON Lines). One object, a newline, the next object.
+- Do NOT wrap them in an array or a top-level object. No prose, no markdown fences, no blank lines.
+- Each line must be exactly one JSON object with these keys:
+  {{"category": "definition|formula|derivation|mistake|high_yield", "content": "...", "importance": 3, "exam_probability": 0.5, "grounded_chunks": [0]}}
+Begin now — one item JSON object per line, nothing else."""
+
+_STREAM_TASK = _TASK.replace(
+    "Return a single JSON object matching the NightBeforeSet schema.", _STREAM_FOOTER
+)
+
+NIGHT_BEFORE_STREAM_PROMPT = ChatPromptTemplate.from_messages([
+    ("system", GROUNDED_SYSTEM_STREAM),
+    ("user", _STREAM_TASK),
 ])

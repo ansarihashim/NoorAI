@@ -24,7 +24,7 @@ from app.rag.retriever import (
     docs_to_numbered_context,
 )
 from app.core.settings import get_settings
-from app.rag.prompts.flashcards import FLASHCARD_PROMPT
+from app.rag.prompts.flashcards import FLASHCARD_PROMPT, FLASHCARD_STREAM_PROMPT
 from app.rag.schemas.flashcards import FlashcardSet
 
 
@@ -70,4 +70,35 @@ def build_flashcard_chain(doc_id: str) -> Runnable:
     ).with_config({"run_name": "flashcard_generation"})
 
 
-__all__ = ["build_flashcard_chain"]
+def build_flashcard_stream_chain(doc_id: str) -> Runnable:
+    """Streaming (JSONL) flashcard chain.
+
+    Same retrieval + numbered context as :func:`build_flashcard_chain`, but the
+    LLM streams (``streaming=True``) and uses NO ``with_structured_output`` —
+    it emits one JSON flashcard per line. Drive it with
+    ``astream_jsonl_items(chain, {"n_cards", "title"}, Flashcard)``.
+    """
+    retriever = EchoVerseRetriever(doc_id=doc_id, k=8)
+
+    def _build_context(_: dict[str, Any]) -> str:
+        return docs_to_numbered_context(retriever.fetch_all())
+
+    s = get_settings()
+    llm = ChatGroq(
+        model=s.groq_model,
+        api_key=s.groq_api_key,
+        temperature=0.4,
+        max_tokens=2400,
+        streaming=True,
+    )
+    return (
+        RunnablePassthrough.assign(context=RunnableLambda(_build_context))
+        | RunnableLambda(
+            lambda x: {"context": x["context"], "n": x["n_cards"], "title": x["title"]}
+        )
+        | FLASHCARD_STREAM_PROMPT
+        | llm
+    ).with_config({"run_name": "flashcard_stream"})
+
+
+__all__ = ["build_flashcard_chain", "build_flashcard_stream_chain"]

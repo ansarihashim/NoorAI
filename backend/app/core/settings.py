@@ -55,6 +55,11 @@ class Settings(BaseSettings):
     langchain_project: str = "noorai"
     langchain_endpoint: str = "https://api.smith.langchain.com"
 
+    # Redis (Upstash) — optional. When empty, the app runs with in-process
+    # caches/locks (graceful degradation, see app/core/redis.py). Use the
+    # rediss:// (TLS) connection string from the Upstash console.
+    upstash_redis_url: str = ""
+
     # App
     app_env: str = "dev"
     cors_origins: str = "http://localhost:5173"

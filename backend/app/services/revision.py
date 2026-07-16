@@ -28,6 +28,12 @@ from app.rag.chains.quiz_chain import build_quiz_chain
 from app.rag.chains.recall_chain import build_recall_chain
 from app.rag.chains.viva_chain import build_viva_chain
 from app.core.settings import get_settings
+from app.core.redis import (
+    is_redis_available,
+    release_lock,
+    try_acquire_lock,
+    wait_for_lock_result,
+)
 from app.rag.schemas.flashcards import Flashcard, FlashcardSet
 from app.rag.schemas.grounded import validate_grounded_indices
 from app.rag.schemas.quiz import QuizQuestion, QuizSet
@@ -98,6 +104,79 @@ def delete_flashcards(doc_id: str) -> bool:
         return False
 
 
+# ---------------------------------------------------------------------------
+# Streaming cache writers
+#
+# The GET /stream endpoints collect the full list of items they streamed and
+# persist it to the SAME on-disk cache the generate/get endpoints use (identical
+# _path(doc_id, feature) file), so a later visit — stream OR generate — is
+# served from cache. Each writer coerces the streamed item dicts into the
+# feature's Set schema (capped to the schema's max length) and writes it; on any
+# validation/IO error it logs and no-ops, since the stream itself already
+# succeeded and returned items to the client.
+
+
+def _write_set(doc_id: str, feature: str, set_obj) -> None:
+    try:
+        _path(doc_id, feature).write_text(set_obj.model_dump_json(), encoding="utf-8")
+    except Exception:
+        logger.exception("revision: failed to write %s stream cache for %s", feature, doc_id)
+
+
+def save_flashcards(doc_id: str, items: list[dict], *, title: str) -> None:
+    try:
+        deck = FlashcardSet(title=title, cards=items[:50])
+    except Exception:
+        logger.exception("revision: cannot cache streamed flashcards for %s", doc_id)
+        return
+    _write_set(doc_id, "flashcards", deck)
+
+
+def save_quiz(doc_id: str, items: list[dict], *, title: str) -> None:
+    try:
+        qs = QuizSet(title=title, questions=items[:30])
+    except Exception:
+        logger.exception("revision: cannot cache streamed quiz for %s", doc_id)
+        return
+    _write_set(doc_id, "quiz", qs)
+
+
+def save_recall(doc_id: str, items: list[dict], *, title: str) -> None:
+    try:
+        rs = RecallSet(title=title, prompts=items[:30])
+    except Exception:
+        logger.exception("revision: cannot cache streamed recall for %s", doc_id)
+        return
+    _write_set(doc_id, "recall", rs)
+
+
+def save_viva(doc_id: str, items: list[dict], *, title: str) -> None:
+    try:
+        vs = VivaSet(title=title, questions=items[:30])
+    except Exception:
+        logger.exception("revision: cannot cache streamed viva for %s", doc_id)
+        return
+    _write_set(doc_id, "viva", vs)
+
+
+def save_night_before(doc_id: str, items: list[dict], *, title: str) -> None:
+    try:
+        nb = NightBeforeSet(title=title, items=items[:60])
+    except Exception:
+        logger.exception("revision: cannot cache streamed night_before for %s", doc_id)
+        return
+    _write_set(doc_id, "night_before", nb)
+
+
+def save_quick_revision(doc_id: str, items: list[dict], *, title: str) -> None:
+    try:
+        qr = QuickRevisionSet(title=title, topics=items[:20])
+    except Exception:
+        logger.exception("revision: cannot cache streamed quick_revision for %s", doc_id)
+        return
+    _write_set(doc_id, "quick_revision", qr)
+
+
 async def generate_flashcards(
     doc_id: str,
     *,
@@ -128,6 +207,36 @@ async def generate_flashcards(
 
     n = max(5, min(40, int(n)))
 
+    # Distributed coalescing (best-effort, Redis). When Redis is up, concurrent
+    # generations for this doc are serialized across workers by a short-lived
+    # lock: the winner generates, losers wait and return the disk cache the
+    # winner writes. If Redis is unconfigured/down/errors — or on force — we
+    # fall straight through to the original in-process coalescing in
+    # _generate_flashcards_local (unchanged). Never raises from Redis.
+    if not force and is_redis_available():
+        lock_key = f"lock:flashcard:{doc_id}"
+        if await try_acquire_lock(lock_key, ttl=120):
+            try:
+                return await _generate_flashcards_local(doc_id, n, rag)
+            finally:
+                await release_lock(lock_key)
+        # Lock held by another worker (or a transient Redis error): wait for
+        # the winner's cached result. On miss/timeout, generate it ourselves.
+        cached = await wait_for_lock_result(lock_key, lambda: load_flashcards(doc_id))
+        if cached is not None:
+            return cached
+
+    return await _generate_flashcards_local(doc_id, n, rag)
+
+
+async def _generate_flashcards_local(doc_id: str, n: int, rag) -> FlashcardSet:
+    """In-process (single-worker) flashcard generation + coalescing.
+
+    This is the original implementation, preserved verbatim as the fallback:
+    it runs whenever Redis is unavailable, and is also the body executed by the
+    Redis lock holder. ``n`` is already clamped and ``rag`` already validated by
+    the caller.
+    """
     key = ("flashcards", doc_id)
     inflight = _INFLIGHT.get(key)
     if inflight is not None:

@@ -1,7 +1,7 @@
 """Prompt template for the active recall chain."""
 from langchain_core.prompts import ChatPromptTemplate
 
-from app.rag.prompts.system import GROUNDED_SYSTEM
+from app.rag.prompts.system import GROUNDED_SYSTEM, GROUNDED_SYSTEM_STREAM
 
 _TASK = """Build {n} active-recall prompts for the document titled: {title}
 
@@ -31,4 +31,22 @@ Return a single JSON object matching the RecallSet schema."""
 RECALL_PROMPT = ChatPromptTemplate.from_messages([
     ("system", GROUNDED_SYSTEM),
     ("user", _TASK),
+])
+
+
+# --- Streaming (JSONL) variant -------------------------------------------------
+_STREAM_FOOTER = """STREAMING OUTPUT (read carefully):
+- Emit each recall prompt as a SEPARATE JSON object on its OWN line (JSON Lines). One object, a newline, the next object.
+- Do NOT wrap them in an array or a top-level object. No prose, no markdown fences, no blank lines.
+- Each line must be exactly one JSON object with these keys:
+  {{"prompt": "...", "kind": "concept|fill_in_blank|explain_in_own_words|short", "expected": "...", "grounded_chunks": [0]}}
+Begin now — one recall JSON object per line, nothing else."""
+
+_STREAM_TASK = _TASK.replace(
+    "Return a single JSON object matching the RecallSet schema.", _STREAM_FOOTER
+)
+
+RECALL_STREAM_PROMPT = ChatPromptTemplate.from_messages([
+    ("system", GROUNDED_SYSTEM_STREAM),
+    ("user", _STREAM_TASK),
 ])

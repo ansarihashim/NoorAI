@@ -39,6 +39,20 @@ OUTPUT RULES:
 """
 
 
+# Streaming variant: same grounding + injection rules, but the model emits one
+# JSON object per line (JSON Lines) so the server can validate and forward each
+# item the moment it lands. Built by swapping only the OUTPUT RULES block so the
+# grounding guardrails stay byte-identical to GROUNDED_SYSTEM.
+_STREAM_OUTPUT_RULES = """OUTPUT RULES (STREAMING — JSON Lines):
+- Emit ONE JSON object per line: an item, then a newline, then the next item.
+- Do NOT wrap items in an array. Do NOT emit a top-level object. Do NOT number the lines.
+- No prose, no markdown fences, no comments, no blank lines between items.
+- Each line must be a complete, valid JSON object on its own, with every key present (empty list/string when you have nothing).
+"""
+
+GROUNDED_SYSTEM_STREAM = GROUNDED_SYSTEM.split("OUTPUT RULES:")[0] + _STREAM_OUTPUT_RULES
+
+
 # Width of an injection-defence boundary marker. The LLM is told above to
 # treat anything between these tags as data; we wrap retrieved context so
 # even a chunk that begins with "Ignore previous instructions" is bracketed

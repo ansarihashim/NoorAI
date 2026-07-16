@@ -15,7 +15,7 @@ from app.rag.retriever import (
     docs_to_numbered_context,
 )
 from app.core.settings import get_settings
-from app.rag.prompts.quiz import QUIZ_PROMPT
+from app.rag.prompts.quiz import QUIZ_PROMPT, QUIZ_STREAM_PROMPT
 from app.rag.schemas.quiz import QuizSet
 
 
@@ -47,4 +47,30 @@ def build_quiz_chain(doc_id: str) -> Runnable:
     ).with_config({"run_name": "quiz_generation"})
 
 
-__all__ = ["build_quiz_chain"]
+def build_quiz_stream_chain(doc_id: str) -> Runnable:
+    """Streaming (JSONL) quiz chain — one JSON question per line, no structured
+    output. Drive with ``astream_jsonl_items(chain, {"n", "title"}, QuizQuestion)``."""
+    retriever = EchoVerseRetriever(doc_id=doc_id, k=8)
+
+    def _build_context(_: dict[str, Any]) -> str:
+        return docs_to_numbered_context(retriever.fetch_all())
+
+    s = get_settings()
+    llm = ChatGroq(
+        model=s.groq_model,
+        api_key=s.groq_api_key,
+        temperature=0.4,
+        max_tokens=3000,
+        streaming=True,
+    )
+    return (
+        RunnablePassthrough.assign(context=RunnableLambda(_build_context))
+        | RunnableLambda(
+            lambda x: {"context": x["context"], "n": x["n"], "title": x["title"]}
+        )
+        | QUIZ_STREAM_PROMPT
+        | llm
+    ).with_config({"run_name": "quiz_stream"})
+
+
+__all__ = ["build_quiz_chain", "build_quiz_stream_chain"]

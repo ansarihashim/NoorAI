@@ -11,7 +11,7 @@ from app.rag.retriever import (
     docs_to_numbered_context,
 )
 from app.core.settings import get_settings
-from app.rag.prompts.night_before import NIGHT_BEFORE_PROMPT
+from app.rag.prompts.night_before import NIGHT_BEFORE_PROMPT, NIGHT_BEFORE_STREAM_PROMPT
 from app.rag.schemas.revision import NightBeforeSet
 
 
@@ -43,4 +43,31 @@ def build_night_before_chain(doc_id: str) -> Runnable:
     ).with_config({"run_name": "night_before_generation"})
 
 
-__all__ = ["build_night_before_chain"]
+def build_night_before_stream_chain(doc_id: str) -> Runnable:
+    """Streaming (JSONL) night-before chain — one JSON item per line, no
+    structured output. Drive with
+    ``astream_jsonl_items(chain, {"n", "title"}, NightBeforeItem)``."""
+    retriever = EchoVerseRetriever(doc_id=doc_id, k=8)
+
+    def _build_context(_: dict[str, Any]) -> str:
+        return docs_to_numbered_context(retriever.fetch_all())
+
+    s = get_settings()
+    llm = ChatGroq(
+        model=s.groq_model,
+        api_key=s.groq_api_key,
+        temperature=0.3,
+        max_tokens=2400,
+        streaming=True,
+    )
+    return (
+        RunnablePassthrough.assign(context=RunnableLambda(_build_context))
+        | RunnableLambda(
+            lambda x: {"context": x["context"], "n": x["n"], "title": x["title"]}
+        )
+        | NIGHT_BEFORE_STREAM_PROMPT
+        | llm
+    ).with_config({"run_name": "night_before_stream"})
+
+
+__all__ = ["build_night_before_chain", "build_night_before_stream_chain"]

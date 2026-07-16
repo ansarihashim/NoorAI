@@ -74,12 +74,31 @@ async def lifespan(app: FastAPI):
     _configure_logging()
     settings = get_settings()
     settings.storage_path  # ensure dir exists
-    logging.getLogger(__name__).info(
+    log = logging.getLogger(__name__)
+    log.info(
         "EchoVerse starting env=%s cors=%s storage=%s",
         settings.app_env, settings.cors_origin_list, settings.storage_path,
     )
+
+    # Redis health check — informational only. A down/unconfigured Redis must
+    # never block startup; every service falls back to in-process state.
+    try:
+        from app.core.redis import ping as redis_ping
+        if await redis_ping():
+            log.info("Redis connected (Upstash)")
+        else:
+            log.info("Redis unavailable — running without cache")
+    except Exception as exc:
+        log.warning("Redis health check errored — running without cache: %s", exc)
+
     yield
-    logging.getLogger(__name__).info("EchoVerse shutdown complete")
+
+    try:
+        from app.core.redis import close as redis_close
+        await redis_close()
+    except Exception:
+        pass
+    log.info("EchoVerse shutdown complete")
 
 
 def create_app() -> FastAPI:

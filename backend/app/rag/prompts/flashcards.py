@@ -1,7 +1,7 @@
 """Prompt template for the flashcard chain."""
 from langchain_core.prompts import ChatPromptTemplate
 
-from app.rag.prompts.system import GROUNDED_SYSTEM
+from app.rag.prompts.system import GROUNDED_SYSTEM, GROUNDED_SYSTEM_STREAM
 
 _TASK = """Build {n} flashcards for the document titled: {title}
 
@@ -37,4 +37,25 @@ Return a single JSON object matching the FlashcardSet schema."""
 FLASHCARD_PROMPT = ChatPromptTemplate.from_messages([
     ("system", GROUNDED_SYSTEM),
     ("user", _TASK),
+])
+
+
+# --- Streaming (JSONL) variant -------------------------------------------------
+# Same guidance as _TASK; only the final output instruction changes to JSON
+# Lines. Literal JSON braces are doubled so ChatPromptTemplate treats them as
+# text (single-brace {n}/{title}/{context} remain template variables).
+_STREAM_FOOTER = """STREAMING OUTPUT (read carefully):
+- Emit each flashcard as a SEPARATE JSON object on its OWN line (JSON Lines). One object, a newline, the next object.
+- Do NOT wrap them in an array or a top-level object. No prose, no markdown fences, no blank lines.
+- Each line must be exactly one JSON object with these keys:
+  {{"question": "...", "answer": "...", "difficulty": "easy|medium|hard", "tags": ["..."], "grounded_chunks": [0]}}
+Begin now — one flashcard JSON object per line, nothing else."""
+
+_STREAM_TASK = _TASK.replace(
+    "Return a single JSON object matching the FlashcardSet schema.", _STREAM_FOOTER
+)
+
+FLASHCARD_STREAM_PROMPT = ChatPromptTemplate.from_messages([
+    ("system", GROUNDED_SYSTEM_STREAM),
+    ("user", _STREAM_TASK),
 ])
