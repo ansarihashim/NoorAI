@@ -136,7 +136,7 @@ def create_app() -> FastAPI:
     # DB/external call — returns a static payload instantly so it can never
     # fail because a dependency is slow. Declared before the routers so it
     # stays a plain unauthenticated route.
-    @app.get("/health")
+    @app.api_route("/health", methods=["GET", "HEAD"])
     async def health_check():
         return {"status": "ok"}
 
