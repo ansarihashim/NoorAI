@@ -81,7 +81,7 @@ function resolveFeature(feature) {
   return FEATURES[feature] || FEATURES[ALIASES[feature]] || null
 }
 
-const WATCHDOG_MS = 3000
+const WATCHDOG_MS = 15000
 
 export default function useRevisionStream(docId, feature, token) {
   const [items, setItems] = useState([])

@@ -62,7 +62,7 @@ const FEATURES = {
   },
 }
 
-const WATCHDOG_MS = 3000
+const WATCHDOG_MS = 15000
 
 export default function usePreparationStream(docIds, feature, token, extraParams) {
   const [items, setItems] = useState([])
