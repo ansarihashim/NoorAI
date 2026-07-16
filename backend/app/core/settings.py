@@ -46,6 +46,15 @@ class Settings(BaseSettings):
     pinecone_cloud: str = "aws"
     pinecone_region: str = "us-east-1"
 
+    # LangSmith tracing — read from the same LANGCHAIN_* env vars LangChain
+    # itself uses. main.py bridges these into os.environ at startup so every
+    # LCEL chain and the LangGraph pipeline are auto-traced. Tracing is a
+    # no-op unless langchain_api_key is non-empty.
+    langchain_tracing_v2: str = ""
+    langchain_api_key: str = ""
+    langchain_project: str = "noorai"
+    langchain_endpoint: str = "https://api.smith.langchain.com"
+
     # App
     app_env: str = "dev"
     cors_origins: str = "http://localhost:5173"

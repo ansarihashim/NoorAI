@@ -40,7 +40,7 @@ def build_recall_chain(doc_id: str) -> Runnable:
         )
         | RECALL_PROMPT
         | llm
-    )
+    ).with_config({"run_name": "recall_generation"})
 
 
 __all__ = ["build_recall_chain"]

@@ -1,4 +1,5 @@
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -37,6 +38,37 @@ def _configure_logging() -> None:
     logging.getLogger("backend").setLevel(logging.INFO)
 
 
+def _truthy(value: object) -> bool:
+    return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _init_langsmith(settings) -> None:
+    """Bridge LANGCHAIN_* settings into os.environ so LangChain's tracer picks
+    them up. Auto-traces every LCEL chain and the LangGraph Overview pipeline —
+    no per-call wiring needed.
+
+    pydantic-settings loads these from .env into the Settings object, but the
+    LangChain tracer reads os.environ directly at runtime, so we export them
+    here. Silently a no-op when no API key is configured — never crashes boot.
+    """
+    log = logging.getLogger(__name__)
+    api_key = (settings.langchain_api_key or "").strip()
+
+    # Gate on the API key (per requirement): missing/empty ⇒ skip silently.
+    # Also honor an explicit LANGCHAIN_TRACING_V2=false opt-out.
+    if not api_key or not _truthy(settings.langchain_tracing_v2):
+        log.info("LangSmith tracing disabled (no API key)")
+        return
+
+    project = (settings.langchain_project or "default").strip()
+    os.environ["LANGCHAIN_TRACING_V2"] = "true"
+    os.environ["LANGCHAIN_API_KEY"] = api_key
+    os.environ["LANGCHAIN_PROJECT"] = project
+    if settings.langchain_endpoint:
+        os.environ["LANGCHAIN_ENDPOINT"] = settings.langchain_endpoint
+    log.info("LangSmith tracing enabled (project: %s)", project)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     _configure_logging()
@@ -53,6 +85,9 @@ async def lifespan(app: FastAPI):
 def create_app() -> FastAPI:
     _configure_logging()
     settings = get_settings()
+    # Wire LangSmith tracing before any chain/LLM is constructed so every run
+    # is captured from the first request onward.
+    _init_langsmith(settings)
     app = FastAPI(
         title="EchoVerse",
         description="Real-time bidirectional AI voice agent",
@@ -77,6 +112,14 @@ def create_app() -> FastAPI:
     # CORS middleware's preflight short-circuit still gets to attach its
     # response headers; ours are layered on top.
     install_security(app)
+
+    # Liveness probe for UptimeRobot (pinged every 5 min). Public, no JWT, no
+    # DB/external call — returns a static payload instantly so it can never
+    # fail because a dependency is slow. Declared before the routers so it
+    # stays a plain unauthenticated route.
+    @app.get("/health")
+    async def health_check():
+        return {"status": "ok"}
 
     app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
     app.include_router(upload.router, prefix="/api", tags=["upload"])

@@ -32,7 +32,7 @@ def build_important_questions_chain(doc_ids: list[str]) -> Runnable:
         | RunnableLambda(lambda x: {"context": x["context"], "n": x["n"]})
         | IMPORTANT_QUESTIONS_PROMPT
         | llm
-    )
+    ).with_config({"run_name": "important_questions_generation"})
 
 
 __all__ = ["build_important_questions_chain"]

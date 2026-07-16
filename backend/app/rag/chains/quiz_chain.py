@@ -44,7 +44,7 @@ def build_quiz_chain(doc_id: str) -> Runnable:
         )
         | QUIZ_PROMPT
         | llm
-    )
+    ).with_config({"run_name": "quiz_generation"})
 
 
 __all__ = ["build_quiz_chain"]

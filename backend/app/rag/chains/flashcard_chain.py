@@ -67,7 +67,7 @@ def build_flashcard_chain(doc_id: str) -> Runnable:
         )
         | FLASHCARD_PROMPT
         | llm
-    )
+    ).with_config({"run_name": "flashcard_generation"})
 
 
 __all__ = ["build_flashcard_chain"]

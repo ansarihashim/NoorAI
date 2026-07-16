@@ -42,7 +42,7 @@ def build_overview_chain(doc_ids: list[str]) -> Runnable:
         )
         | OVERVIEW_PROMPT
         | llm
-    )
+    ).with_config({"run_name": "overview_generation"})
 
 
 __all__ = ["build_overview_chain"]

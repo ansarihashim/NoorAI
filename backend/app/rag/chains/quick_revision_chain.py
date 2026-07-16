@@ -44,7 +44,7 @@ def build_quick_revision_chain(doc_id: str) -> Runnable:
         )
         | QUICK_REVISION_PROMPT
         | llm
-    )
+    ).with_config({"run_name": "quick_revision_generation"})
 
 
 __all__ = ["build_quick_revision_chain"]

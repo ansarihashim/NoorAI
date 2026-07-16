@@ -40,7 +40,7 @@ def build_night_before_chain(doc_id: str) -> Runnable:
         )
         | NIGHT_BEFORE_PROMPT
         | llm
-    )
+    ).with_config({"run_name": "night_before_generation"})
 
 
 __all__ = ["build_night_before_chain"]

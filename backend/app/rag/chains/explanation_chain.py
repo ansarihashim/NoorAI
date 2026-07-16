@@ -82,7 +82,7 @@ def build_explanation_chain(doc_ids: list[str]) -> Runnable:
         | RunnableLambda(lambda x: {"context": x["context"], "topic": x["topic"]})
         | EXPLANATION_PROMPT
         | llm
-    )
+    ).with_config({"run_name": "explanation_generation"})
 
 
 __all__ = ["build_explanation_chain"]

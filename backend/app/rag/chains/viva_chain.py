@@ -40,7 +40,7 @@ def build_viva_chain(doc_id: str) -> Runnable:
         )
         | VIVA_PROMPT
         | llm
-    )
+    ).with_config({"run_name": "viva_generation"})
 
 
 __all__ = ["build_viva_chain"]

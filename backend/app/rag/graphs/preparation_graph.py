@@ -111,6 +111,14 @@ def build_overview_graph():
     """Compile the Overview LangGraph.
 
     Returns the compiled graph; the caller invokes ``.invoke(state_dict)``.
+
+    LangGraph is built on langchain-core Runnables, so once LangSmith tracing
+    is enabled (LANGCHAIN_* env vars, wired in app/main.py) the whole graph run
+    — each node plus the nested ``overview_generation`` chain call inside
+    ``_node_analyze`` — is captured automatically; no LangGraph-specific config
+    is required. ``with_config`` here only sets a readable root-span name.
+    ``CompiledStateGraph.with_config`` returns a copy of the compiled graph, so
+    ``.invoke`` and every other graph method still work on the result.
     """
     g: StateGraph = StateGraph(OverviewState)
     g.add_node("ingest", _node_ingest)
@@ -125,7 +133,7 @@ def build_overview_graph():
         _route,
         {"ok": END, "retry": "analyze", "give_up": END},
     )
-    return g.compile()
+    return g.compile().with_config({"run_name": "overview_preparation_graph"})
 
 
 # Module-level singleton — graph compilation is cheap but caching avoids the

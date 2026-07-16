@@ -5,6 +5,7 @@ import logging
 from typing import AsyncIterator
 
 from groq import AsyncGroq
+from langsmith import traceable
 
 from app.core.settings import get_settings
 
@@ -240,6 +241,19 @@ class GroqService:
         )
         return resp.choices[0].message.content or "{}"
 
+    # @traceable is safe to apply unconditionally — no try/except guard needed:
+    #   • langsmith is a hard dependency (pinned in requirements.txt, and pulled
+    #     in transitively by langchain-core), so the import above never fails.
+    #   • When tracing is OFF (no LANGCHAIN_API_KEY, or LANGCHAIN_TRACING_V2 not
+    #     truthy — see _init_langsmith in app/main.py), the decorator detects
+    #     that tracing is disabled and calls the wrapped coroutine directly. It
+    #     makes no network call and adds negligible overhead — a genuine no-op.
+    #   • No secret leakage: langsmith's input collector pops `self` (and `cls`)
+    #     before serializing, so the GroqService instance and its AsyncGroq
+    #     client — which hold the API key — are never logged. Only the `title`
+    #     and `notes` arguments are captured as the run's input, and the returned
+    #     script string as its output.
+    @traceable(run_type="llm", name="podcast_script_generation")
     async def generate_podcast(self, title: str, notes: list[str]) -> str:
         """Single-shot podcast script generation. Returns raw model text — caller parses JSON."""
         ctx = "\n\n---\n\n".join(notes) if notes else "(no notes)"

@@ -28,6 +28,12 @@ langchain-core==0.3.72
 langchain-groq==0.2.4
 langgraph==0.2.55
 
+# LangSmith tracing — auto-traces every LCEL chain + the LangGraph Overview
+# pipeline when LANGCHAIN_TRACING_V2/LANGCHAIN_API_KEY are set (wired in
+# app/main.py). Already pulled in transitively by langchain-core; pinned here
+# to the version this app is built/tested against.
+langsmith==0.8.3
+
 # DB
 sqlalchemy[asyncio]==2.0.36
 asyncpg==0.30.0
