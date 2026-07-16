@@ -1,24 +1,23 @@
 import { useCallback, useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import {
-  deleteOverview,
-  generateOverview,
-  getOverview,
-} from '../../lib/api.js'
+import { getOverview } from '../../lib/api.js'
+import usePreparationStream from '../../hooks/usePreparationStream.js'
 import { useMultiDocCitations, format as formatCitation } from '../../lib/citations.jsx'
 import { useToast } from '../ui/Toast.jsx'
 import Button from '../ui/Button.jsx'
 import Dialog from '../ui/Dialog.jsx'
 import Skeleton from '../ui/Skeleton.jsx'
-import GenerationProgress, { OVERVIEW_STAGES } from '../ui/GenerationProgress.jsx'
 
 export default function OverviewView({ docIds, action }) {
   const toast = useToast()
   const citationsByDoc = useMultiDocCitations(docIds)
   const [overview, setOverview] = useState(null) // null=loading|undefined=none|object=loaded
-  const [busy, setBusy] = useState(false)
   const [confirmRegen, setConfirmRegen] = useState(false)
+  const [streaming, setStreaming] = useState(false)
   const [open, setOpen] = useState(new Set())
+
+  const { text, isStreaming, isDone, error, startStream, reset } =
+    usePreparationStream(docIds, 'overview')
 
   // Reset whenever the doc set changes.
   useEffect(() => {
@@ -40,51 +39,42 @@ export default function OverviewView({ docIds, action }) {
     return () => { cancelled = true }
   }, [docIds.join('|'), toast])
 
-  const onGenerate = useCallback(async () => {
-    if (busy) return
-    setBusy(true)
-    try {
-      const o = await generateOverview(docIds, { force: overview != null })
-      setOverview(o)
-      setOpen(new Set([0]))
-      toast.success('Overview ready', `${o.topics.length} topics`)
-    } catch (err) {
-      toast.error('Generation failed', err?.message || String(err))
-    } finally {
-      setBusy(false); setConfirmRegen(false)
-    }
-  }, [busy, docIds, overview, toast])
+  // Stream finished → the backend persisted the parsed OverviewMap, so load the
+  // canonical object. Fall back to parsing the streamed JSON text directly.
+  useEffect(() => {
+    if (!streaming || !isDone) return
+    let cancelled = false
+    ;(async () => {
+      let parsed = null
+      try { parsed = await getOverview(docIds) } catch { /* not persisted / invalid */ }
+      if (!parsed) {
+        try { const p = JSON.parse(text); if (p && Array.isArray(p.topics)) parsed = p } catch { /* invalid */ }
+      }
+      if (!cancelled) {
+        if (parsed && Array.isArray(parsed.topics)) { setOverview(parsed); setOpen(new Set([0])) }
+        else { toast.error('Overview failed', 'Could not parse the generated overview.'); setOverview((o) => (o === null ? undefined : o)) }
+        setStreaming(false)
+      }
+    })()
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDone, streaming])
 
-  const onRegen = useCallback(() => {
-    if (overview) setConfirmRegen(true)
-    else onGenerate()
-  }, [overview, onGenerate])
+  const beginStream = useCallback((opts) => { setStreaming(true); startStream(opts) }, [startStream])
+  const onGenerate = useCallback(() => { if (!streaming) beginStream({}) }, [streaming, beginStream])
+  const onRegen = useCallback(() => { if (overview) setConfirmRegen(true); else onGenerate() }, [overview, onGenerate])
+  const performRegen = useCallback(() => { setConfirmRegen(false); beginStream({ force: true }) }, [beginStream])
+  const onTryAgain = useCallback(() => { reset(); beginStream({}) }, [reset, beginStream])
 
   // React to right-rail "Generate overview" / "Topic relationships" actions.
   useEffect(() => {
     if (!action) return
     if (action.action !== 'overview' && action.action !== 'topic-relationships') return
-    if (busy) return
-    if (overview === null) return // still loading; ignore so we don't double-fire
+    if (streaming || overview === null) return
     if (overview === undefined) onGenerate()
     else setConfirmRegen(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [action])
-
-  const performRegen = useCallback(async () => {
-    setBusy(true)
-    try {
-      try { await deleteOverview(docIds) } catch {}
-      const o = await generateOverview(docIds, { force: true })
-      setOverview(o)
-      setOpen(new Set([0]))
-      toast.success('Regenerated', `${o.topics.length} topics`)
-    } catch (err) {
-      toast.error('Regeneration failed', err?.message)
-    } finally {
-      setBusy(false); setConfirmRegen(false)
-    }
-  }, [docIds, toast])
 
   const toggle = (i) => {
     setOpen((cur) => {
@@ -94,7 +84,7 @@ export default function OverviewView({ docIds, action }) {
     })
   }
 
-  if (overview === null) {
+  if (overview === null && !streaming) {
     return (
       <div className="space-y-3">
         <Skeleton className="h-8 w-1/3" />
@@ -104,8 +94,12 @@ export default function OverviewView({ docIds, action }) {
     )
   }
 
+  if (streaming) {
+    return <OverviewStreaming text={text} isStreaming={isStreaming} error={error} onTryAgain={onTryAgain} />
+  }
+
   if (overview === undefined) {
-    return <EmptyState busy={busy} onGenerate={onGenerate} nDocs={docIds.length} />
+    return <EmptyState onGenerate={onGenerate} nDocs={docIds.length} />
   }
 
   return (
@@ -117,7 +111,7 @@ export default function OverviewView({ docIds, action }) {
             {overview.title}
           </h2>
         </div>
-        <Button onClick={onRegen} loading={busy} variant="secondary" size="sm">
+        <Button onClick={onRegen} variant="secondary" size="sm">
           Regenerate
         </Button>
       </div>
@@ -220,13 +214,13 @@ export default function OverviewView({ docIds, action }) {
 
       <Dialog
         open={confirmRegen}
-        onClose={() => !busy && setConfirmRegen(false)}
+        onClose={() => setConfirmRegen(false)}
         title="Regenerate the overview?"
-        description="This re-runs the analysis pipeline (LangGraph) for the current document set."
+        description="This re-runs the analysis for the current document set and streams the result."
       >
         <div className="mt-2 flex justify-end gap-2">
-          <Button variant="ghost" onClick={() => setConfirmRegen(false)} disabled={busy}>Cancel</Button>
-          <Button variant="primary" loading={busy} onClick={performRegen}>Regenerate</Button>
+          <Button variant="ghost" onClick={() => setConfirmRegen(false)}>Cancel</Button>
+          <Button variant="primary" onClick={performRegen}>Regenerate</Button>
         </div>
       </Dialog>
     </div>
@@ -249,7 +243,38 @@ function ImportancePips({ level = 3 }) {
   )
 }
 
-function EmptyState({ busy, onGenerate, nDocs }) {
+// While streaming, show the raw model output flowing in with a typewriter
+// cursor (the overview is JSON — we deliberately don't parse mid-stream). On
+// completion the parent parses it and renders the formatted topic list.
+function OverviewStreaming({ text, isStreaming, error, onTryAgain }) {
+  return (
+    <div className="flex flex-col gap-4">
+      <div>
+        <span className="font-caption text-ink-muted">overview</span>
+        <h2 className="mt-1 text-xl font-semibold tracking-tight text-ink sm:text-[1.5rem]">
+          Analyzing…
+        </h2>
+      </div>
+      <div className="max-h-[420px] overflow-auto rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
+        <pre className="whitespace-pre-wrap break-words font-mono text-[0.72rem] leading-relaxed text-ink-muted">
+          {text}
+          {isStreaming && (
+            <span className="ml-0.5 inline-block h-3.5 w-[2px] translate-y-[3px] animate-pulse bg-accent-purple-soft" />
+          )}
+        </pre>
+      </div>
+      {error && (
+        <div className="rounded-xl border border-accent-rose/30 bg-accent-rose/[0.06] p-4">
+          <p className="text-[0.9rem] text-ink">Generation failed.</p>
+          <p className="mt-1 text-[0.8rem] text-ink-muted">{error}</p>
+          <Button className="mt-3" size="sm" variant="secondary" onClick={onTryAgain}>Try again</Button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function EmptyState({ onGenerate, nDocs }) {
   return (
     <div className="grid place-items-center py-16 text-center">
       <div className="max-w-md">
@@ -264,26 +289,14 @@ function EmptyState({ busy, onGenerate, nDocs }) {
           </svg>
         </div>
         <h3 className="mt-5 font-display text-xl font-semibold text-ink">
-          {busy ? 'Building the overview…' : 'Build a syllabus overview.'}
+          Build a syllabus overview.
         </h3>
-        {!busy && (
-          <p className="mx-auto mt-2 max-w-sm text-pretty text-sm text-ink-muted">
-            A LangGraph pipeline analyses the {nDocs > 1 ? `${nDocs} documents` : 'document'}, identifies topics and dependencies, and produces a Mermaid map.
-          </p>
-        )}
-        {busy ? (
-          <div className="mt-6">
-            <GenerationProgress
-              active
-              stages={OVERVIEW_STAGES}
-              overrunLabel="Validating the dependency graph"
-            />
-          </div>
-        ) : (
-          <Button onClick={onGenerate} loading={busy} size="lg" className="mt-6">
-            Build overview
-          </Button>
-        )}
+        <p className="mx-auto mt-2 max-w-sm text-pretty text-sm text-ink-muted">
+          NoorAI analyses the {nDocs > 1 ? `${nDocs} documents` : 'document'}, identifies topics and dependencies, and streams the result as it writes.
+        </p>
+        <Button onClick={onGenerate} size="lg" className="mt-6">
+          Build overview
+        </Button>
       </div>
     </div>
   )

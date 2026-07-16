@@ -1,8 +1,7 @@
 import { motion } from 'framer-motion'
 import { useSearchParams } from 'react-router-dom'
-import { useCallback, useEffect } from 'react'
+import { useEffect } from 'react'
 import PremiumPlayer from '../player/PremiumPlayer.jsx'
-import GenerationProgress, { PODCAST_STAGES } from '../ui/GenerationProgress.jsx'
 import { usePodcastSession } from '../workspace/PodcastSessionContext.jsx'
 
 /**
@@ -23,7 +22,7 @@ export default function PodcastPlayback({
   // eslint-disable-next-line no-unused-vars
   serverState, wsStatus, sendJson,
 }) {
-  const { turns, status, errorMsg, busy, chapters, audio, generate, seekTurn } = usePodcastSession()
+  const { turns, status, errorMsg, busy, progress, chapters, audio, generate, seekTurn } = usePodcastSession()
   const [searchParams, setSearchParams] = useSearchParams()
   const action = searchParams.get('action')
 
@@ -57,12 +56,21 @@ export default function PodcastPlayback({
               : 'Two voices riff on this source — useful for a passive listen or a different angle on the material.'}
           </p>
           {status === 'generating' ? (
-            <div className="mt-6">
-              <GenerationProgress
-                active
-                stages={PODCAST_STAGES}
-                overrunLabel="Finalising — almost there"
-              />
+            <div className="mt-6 flex flex-col items-center gap-3">
+              <div className="flex items-center gap-2 text-[0.85rem] text-ink-muted">
+                <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-r-transparent" />
+                {progress.total > 0
+                  ? `Synthesizing turn ${Math.min(progress.done + 1, progress.total)} of ${progress.total}…`
+                  : 'Composing the script…'}
+              </div>
+              {progress.total > 0 && (
+                <div className="h-1 w-56 overflow-hidden rounded-full bg-rule">
+                  <div
+                    className="h-full rounded-full bg-accent transition-all"
+                    style={{ width: `${Math.round((progress.done / progress.total) * 100)}%` }}
+                  />
+                </div>
+              )}
             </div>
           ) : (
             <button

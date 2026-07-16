@@ -85,6 +85,12 @@ def all_turn_paths(doc_id: str, n_turns: int) -> list[Path]:
     return [_turn_path(doc_id, i) for i in range(n_turns)]
 
 
+def turn_cached(doc_id: str, idx: int) -> bool:
+    """True if turn ``idx``'s audio is already synthesized + cached for the
+    current voice pair. Used by the progress stream to skip re-synthesis."""
+    return _turn_path(doc_id, idx).exists()
+
+
 def _extract_turns(raw: str) -> list[dict]:
     """Tolerate either ``{"turns": [...]}`` (response_format=json_object) or a
     bare ``[...]`` array, with or without ```json fences."""

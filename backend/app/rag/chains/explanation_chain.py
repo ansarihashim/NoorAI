@@ -14,7 +14,7 @@ from langchain_groq import ChatGroq
 
 from app.rag.retriever import EchoVerseRetriever, docs_to_numbered_context
 from app.core.settings import get_settings
-from app.rag.prompts.explanation import EXPLANATION_PROMPT
+from app.rag.prompts.explanation import EXPLANATION_PROMPT, EXPLANATION_STREAM_PROMPT
 from app.rag.schemas.preparation import SimpleExplanation
 
 logger = logging.getLogger(__name__)
@@ -85,4 +85,54 @@ def build_explanation_chain(doc_ids: list[str]) -> Runnable:
     ).with_config({"run_name": "explanation_generation"})
 
 
-__all__ = ["build_explanation_chain"]
+def build_explanation_stream_chain(doc_ids: list[str]) -> Runnable:
+    """Streaming (prose) explanation chain — streams plain-text tokens for the
+    live typing effect. Same per-topic multi-doc retrieval as
+    :func:`build_explanation_chain`, but no structured output. Drive with
+    ``astream_tokens(chain, {"topic": topic})``.
+    """
+    def _ctx(x: dict[str, Any]) -> str:
+        topic = x["topic"]
+        all_docs = []
+        for d_id in doc_ids:
+            r = EchoVerseRetriever(doc_id=d_id, k=6)
+            try:
+                all_docs.extend(r.invoke(topic))
+            except Exception:
+                logger.exception(
+                    "explanation_stream: retrieval failed for doc=%s topic=%r", d_id, topic[:80]
+                )
+                continue
+        lines: list[str] = []
+        total = 0
+        cap = 12000
+        for d in all_docs:
+            doc_id = d.metadata.get("doc_id")
+            chunk_idx = d.metadata.get("chunk_idx")
+            text = " ".join(d.page_content.split())
+            line = f"[{doc_id}#{chunk_idx}] {text}"
+            if total + len(line) + 2 > cap:
+                break
+            lines.append(line)
+            total += len(line) + 2
+        if not lines:
+            return "(no notes available)"
+        return "\n\n".join(lines)
+
+    s = get_settings()
+    llm = ChatGroq(
+        model=s.groq_model,
+        api_key=s.groq_api_key,
+        temperature=0.5,
+        max_tokens=2400,
+        streaming=True,
+    )
+    return (
+        RunnablePassthrough.assign(context=RunnableLambda(_ctx))
+        | RunnableLambda(lambda x: {"context": x["context"], "topic": x["topic"]})
+        | EXPLANATION_STREAM_PROMPT
+        | llm
+    ).with_config({"run_name": "explanation_stream"})
+
+
+__all__ = ["build_explanation_chain", "build_explanation_stream_chain"]

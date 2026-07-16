@@ -1,14 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import {
-  deleteNightBefore,
-  generateNightBefore,
-  getNightBefore,
-} from '../../lib/api.js'
+import { getNightBefore } from '../../lib/api.js'
+import useRevisionStream from '../../hooks/useRevisionStream.js'
 import { useToast } from '../ui/Toast.jsx'
 import Button from '../ui/Button.jsx'
 import Dialog from '../ui/Dialog.jsx'
 import Skeleton from '../ui/Skeleton.jsx'
+import StreamingList from './StreamingList.jsx'
 
 const N_OPTIONS = [15, 25, 35, 50]
 
@@ -32,11 +30,15 @@ const CAT_TONE = {
 export default function NightBeforeView({ docId, action }) {
   const toast = useToast()
   const [set, setSet] = useState(null)
-  const [busy, setBusy] = useState(false)
   const [n, setN] = useState(25)
   const [confirmRegen, setConfirmRegen] = useState(false)
+  const [streaming, setStreaming] = useState(false)
   const [filter, setFilter] = useState('all')
   const [sortBy, setSortBy] = useState('importance') // importance | exam_probability | category
+
+  const {
+    items: streamItems, isStreaming, isDone, error, total, startStream, reset,
+  } = useRevisionStream(docId, 'night_before')
 
   useEffect(() => {
     if (!docId) return
@@ -55,47 +57,38 @@ export default function NightBeforeView({ docId, action }) {
     return () => { cancelled = true }
   }, [docId, toast])
 
-  const onGenerate = useCallback(async () => {
-    if (busy) return
-    setBusy(true)
-    try {
-      const r = await generateNightBefore(docId, { n, force: set != null })
-      setSet(r)
-      toast.success('Cheat sheet ready', `${r.items.length} items`)
-    } catch (err) {
-      toast.error('Generation failed', err?.message || String(err))
-    } finally {
-      setBusy(false); setConfirmRegen(false)
-    }
-  }, [busy, n, docId, set, toast])
+  useEffect(() => {
+    if (!streaming || !isDone) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const r = await getNightBefore(docId)
+        if (!cancelled) setSet(r)
+      } catch {
+        if (!cancelled && streamItems.length) {
+          setSet({ title: set?.title || 'Night Before', items: streamItems })
+        }
+      }
+      if (!cancelled) setStreaming(false)
+    })()
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDone, streaming])
 
-  const onRegen = useCallback(() => {
-    if (set) setConfirmRegen(true)
-    else onGenerate()
-  }, [set, onGenerate])
+  const beginStream = useCallback((opts) => { setStreaming(true); startStream(opts) }, [startStream])
+  const onGenerate = useCallback(() => { if (!streaming) beginStream({ n }) }, [streaming, n, beginStream])
+  const onRegen = useCallback(() => { if (set) setConfirmRegen(true); else onGenerate() }, [set, onGenerate])
+  const performRegen = useCallback(() => { setConfirmRegen(false); beginStream({ n, force: true }) }, [n, beginStream])
+  const onTryAgain = useCallback(() => { reset(); beginStream({ n }) }, [reset, n, beginStream])
 
   // Right-rail "Night-before pack" trigger.
   useEffect(() => {
     if (!action || !action.generate) return
-    if (busy || set === null) return
+    if (streaming || set === null) return
     if (set === undefined) onGenerate()
     else setConfirmRegen(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [action])
-
-  const performRegen = useCallback(async () => {
-    setBusy(true)
-    try {
-      try { await deleteNightBefore(docId) } catch {}
-      const r = await generateNightBefore(docId, { n, force: true })
-      setSet(r)
-      toast.success('Regenerated', `${r.items.length} items`)
-    } catch (err) {
-      toast.error('Regeneration failed', err?.message)
-    } finally {
-      setBusy(false); setConfirmRegen(false)
-    }
-  }, [docId, n, toast])
 
   const items = useMemo(() => {
     if (!set) return []
@@ -108,7 +101,7 @@ export default function NightBeforeView({ docId, action }) {
     return sorted
   }, [set, filter, sortBy])
 
-  if (set === null) {
+  if (set === null && !streaming) {
     return (
       <div className="grid place-items-center py-16">
         <div className="w-full max-w-3xl space-y-3">
@@ -120,8 +113,31 @@ export default function NightBeforeView({ docId, action }) {
     )
   }
 
+  if (streaming) {
+    return (
+      <StreamingList
+        label="night before exam"
+        items={streamItems}
+        isStreaming={isStreaming}
+        isDone={isDone}
+        error={error}
+        total={total}
+        onTryAgain={onTryAgain}
+        noneLabel="No items were produced."
+        renderItem={(it) => (
+          <>
+            <p className="text-[0.9rem] font-medium leading-snug text-ink">{it.content}</p>
+            <p className="mt-1.5 text-[0.7rem] uppercase tracking-[0.08em] text-ink-faint">
+              {(it.category || '').replace('_', ' ')}
+            </p>
+          </>
+        )}
+      />
+    )
+  }
+
   if (set === undefined) {
-    return <EmptyState n={n} onN={setN} busy={busy} onGenerate={onGenerate} />
+    return <EmptyState n={n} onN={setN} onGenerate={onGenerate} />
   }
 
   return (
@@ -134,8 +150,8 @@ export default function NightBeforeView({ docId, action }) {
           </h2>
         </div>
         <div className="flex items-center gap-2">
-          <NPill value={n} onChange={setN} disabled={busy} options={N_OPTIONS} />
-          <Button onClick={onRegen} loading={busy} variant="secondary" size="sm">Regenerate</Button>
+          <NPill value={n} onChange={setN} disabled={false} options={N_OPTIONS} />
+          <Button onClick={onRegen} variant="secondary" size="sm">Regenerate</Button>
         </div>
       </div>
 
@@ -205,13 +221,13 @@ export default function NightBeforeView({ docId, action }) {
 
       <Dialog
         open={confirmRegen}
-        onClose={() => !busy && setConfirmRegen(false)}
+        onClose={() => setConfirmRegen(false)}
         title="Regenerate the cheat sheet?"
         description={`This replaces ${set.items.length} items with up to ${n} fresh ones.`}
       >
         <div className="mt-2 flex justify-end gap-2">
-          <Button variant="ghost" onClick={() => setConfirmRegen(false)} disabled={busy}>Cancel</Button>
-          <Button variant="primary" loading={busy} onClick={performRegen}>Regenerate</Button>
+          <Button variant="ghost" onClick={() => setConfirmRegen(false)}>Cancel</Button>
+          <Button variant="primary" onClick={performRegen}>Regenerate</Button>
         </div>
       </Dialog>
     </div>
@@ -256,7 +272,7 @@ function NPill({ value, onChange, disabled, options }) {
   )
 }
 
-function EmptyState({ n, onN, busy, onGenerate }) {
+function EmptyState({ n, onN, onGenerate }) {
   return (
     <div className="grid place-items-center py-16 text-center">
       <div className="max-w-md">
@@ -273,8 +289,8 @@ function EmptyState({ n, onN, busy, onGenerate }) {
           A ranked cheat sheet — definitions, formulas, must-remembers, and common mistakes — every line grounded in your notes.
         </p>
         <div className="mt-6 inline-flex items-center gap-3">
-          <NPill value={n} onChange={onN} disabled={busy} options={N_OPTIONS} />
-          <Button onClick={onGenerate} loading={busy} size="lg">Generate {n} items</Button>
+          <NPill value={n} onChange={onN} disabled={false} options={N_OPTIONS} />
+          <Button onClick={onGenerate} size="lg">Generate {n} items</Button>
         </div>
       </div>
     </div>

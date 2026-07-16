@@ -1,15 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import {
-  deleteQuickRevision,
-  generateQuickRevision,
-  getQuickRevision,
-} from '../../lib/api.js'
+import { getQuickRevision } from '../../lib/api.js'
+import useRevisionStream from '../../hooks/useRevisionStream.js'
 import { useCitations } from '../../lib/citations.jsx'
 import { useToast } from '../ui/Toast.jsx'
 import Button from '../ui/Button.jsx'
 import Dialog from '../ui/Dialog.jsx'
 import Skeleton from '../ui/Skeleton.jsx'
+import StreamingList from './StreamingList.jsx'
 
 const TOPIC_OPTIONS = [5, 8, 10, 15]
 
@@ -17,10 +15,14 @@ export default function QuickRevisionView({ docId, action }) {
   const citations = useCitations()
   const toast = useToast()
   const [set, setSet] = useState(null)
-  const [busy, setBusy] = useState(false)
   const [maxTopics, setMaxTopics] = useState(8)
   const [confirmRegen, setConfirmRegen] = useState(false)
+  const [streaming, setStreaming] = useState(false)
   const [open, setOpen] = useState(new Set([0])) // first topic open by default
+
+  const {
+    items: streamItems, isStreaming, isDone, error, total, startStream, reset,
+  } = useRevisionStream(docId, 'quick_revision')
 
   useEffect(() => {
     if (!docId) return
@@ -39,47 +41,39 @@ export default function QuickRevisionView({ docId, action }) {
     return () => { cancelled = true }
   }, [docId, toast])
 
-  const onGenerate = useCallback(async () => {
-    if (busy) return
-    setBusy(true)
-    try {
-      const r = await generateQuickRevision(docId, { max_topics: maxTopics, force: set != null })
-      setSet(r); setOpen(new Set([0]))
-      toast.success('Quick revision ready', `${r.topics.length} topics`)
-    } catch (err) {
-      toast.error('Generation failed', err?.message || String(err))
-    } finally {
-      setBusy(false); setConfirmRegen(false)
-    }
-  }, [busy, maxTopics, docId, set, toast])
+  useEffect(() => {
+    if (!streaming || !isDone) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const r = await getQuickRevision(docId)
+        if (!cancelled) { setSet(r); setOpen(new Set([0])) }
+      } catch {
+        if (!cancelled && streamItems.length) {
+          setSet({ title: set?.title || 'Quick Revision', topics: streamItems })
+          setOpen(new Set([0]))
+        }
+      }
+      if (!cancelled) setStreaming(false)
+    })()
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDone, streaming])
 
-  const onRegen = useCallback(() => {
-    if (set) setConfirmRegen(true)
-    else onGenerate()
-  }, [set, onGenerate])
+  const beginStream = useCallback((opts) => { setStreaming(true); startStream(opts) }, [startStream])
+  const onGenerate = useCallback(() => { if (!streaming) beginStream({ max_topics: maxTopics }) }, [streaming, maxTopics, beginStream])
+  const onRegen = useCallback(() => { if (set) setConfirmRegen(true); else onGenerate() }, [set, onGenerate])
+  const performRegen = useCallback(() => { setConfirmRegen(false); beginStream({ max_topics: maxTopics, force: true }) }, [maxTopics, beginStream])
+  const onTryAgain = useCallback(() => { reset(); beginStream({ max_topics: maxTopics }) }, [reset, maxTopics, beginStream])
 
   // Right-rail "Quick revision" trigger.
   useEffect(() => {
     if (!action || !action.generate) return
-    if (busy || set === null) return
+    if (streaming || set === null) return
     if (set === undefined) onGenerate()
     else setConfirmRegen(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [action])
-
-  const performRegen = useCallback(async () => {
-    setBusy(true)
-    try {
-      try { await deleteQuickRevision(docId) } catch {}
-      const r = await generateQuickRevision(docId, { max_topics: maxTopics, force: true })
-      setSet(r); setOpen(new Set([0]))
-      toast.success('Regenerated', `${r.topics.length} topics`)
-    } catch (err) {
-      toast.error('Regeneration failed', err?.message)
-    } finally {
-      setBusy(false); setConfirmRegen(false)
-    }
-  }, [docId, maxTopics, toast])
 
   const toggleAll = useCallback(() => {
     if (!set) return
@@ -96,7 +90,7 @@ export default function QuickRevisionView({ docId, action }) {
     })
   }, [])
 
-  if (set === null) {
+  if (set === null && !streaming) {
     return (
       <div className="grid place-items-center py-16">
         <div className="w-full max-w-2xl space-y-3">
@@ -109,8 +103,29 @@ export default function QuickRevisionView({ docId, action }) {
     )
   }
 
+  if (streaming) {
+    return (
+      <StreamingList
+        label="quick revision"
+        items={streamItems}
+        isStreaming={isStreaming}
+        isDone={isDone}
+        error={error}
+        total={total}
+        onTryAgain={onTryAgain}
+        noneLabel="No topics were produced."
+        renderItem={(t) => (
+          <>
+            <p className="text-[0.9rem] font-medium leading-snug text-ink">{t.title}</p>
+            <p className="mt-1.5 line-clamp-2 text-[0.85rem] leading-relaxed text-ink-muted">{t.summary}</p>
+          </>
+        )}
+      />
+    )
+  }
+
   if (set === undefined) {
-    return <EmptyState n={maxTopics} onN={setMaxTopics} busy={busy} onGenerate={onGenerate} />
+    return <EmptyState n={maxTopics} onN={setMaxTopics} onGenerate={onGenerate} />
   }
 
   const allOpen = open.size === set.topics.length
@@ -125,11 +140,11 @@ export default function QuickRevisionView({ docId, action }) {
           </h2>
         </div>
         <div className="flex items-center gap-2">
-          <NPill value={maxTopics} onChange={setMaxTopics} disabled={busy} />
+          <NPill value={maxTopics} onChange={setMaxTopics} disabled={false} />
           <Button onClick={toggleAll} variant="ghost" size="sm">
             {allOpen ? 'Collapse all' : 'Expand all'}
           </Button>
-          <Button onClick={onRegen} loading={busy} variant="secondary" size="sm">
+          <Button onClick={onRegen} variant="secondary" size="sm">
             Regenerate
           </Button>
         </div>
@@ -211,13 +226,13 @@ export default function QuickRevisionView({ docId, action }) {
 
       <Dialog
         open={confirmRegen}
-        onClose={() => !busy && setConfirmRegen(false)}
+        onClose={() => setConfirmRegen(false)}
         title="Regenerate the revision summary?"
         description={`This replaces ${set.topics.length} topics with up to ${maxTopics} fresh ones.`}
       >
         <div className="mt-2 flex justify-end gap-2">
-          <Button variant="ghost" onClick={() => setConfirmRegen(false)} disabled={busy}>Cancel</Button>
-          <Button variant="primary" loading={busy} onClick={performRegen}>Regenerate</Button>
+          <Button variant="ghost" onClick={() => setConfirmRegen(false)}>Cancel</Button>
+          <Button variant="primary" onClick={performRegen}>Regenerate</Button>
         </div>
       </Dialog>
     </div>
@@ -246,7 +261,7 @@ function NPill({ value, onChange, disabled }) {
   )
 }
 
-function EmptyState({ n, onN, busy, onGenerate }) {
+function EmptyState({ n, onN, onGenerate }) {
   return (
     <div className="grid place-items-center py-16 text-center">
       <div className="max-w-md">
@@ -262,8 +277,8 @@ function EmptyState({ n, onN, busy, onGenerate }) {
           Topic-grouped summaries with must-remember key points — perfect for the day before an exam.
         </p>
         <div className="mt-6 inline-flex items-center gap-3">
-          <NPill value={n} onChange={onN} disabled={busy} />
-          <Button onClick={onGenerate} loading={busy} size="lg">Generate up to {n} topics</Button>
+          <NPill value={n} onChange={onN} disabled={false} />
+          <Button onClick={onGenerate} size="lg">Generate up to {n} topics</Button>
         </div>
       </div>
     </div>

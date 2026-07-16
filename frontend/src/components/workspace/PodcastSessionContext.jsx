@@ -3,7 +3,8 @@ import { useParams } from 'react-router-dom'
 import { useAudio } from '../../hooks/useAudio.js'
 import { useMediaSession } from '../../hooks/useMediaSession.js'
 import { useKeyboardControls } from '../../hooks/useKeyboardControls.js'
-import { generatePodcast, getPodcast, podcastTurnUrl } from '../../lib/api.js'
+import { apiBase, generatePodcast, getPodcast, getToken, podcastTurnUrl } from '../../lib/api.js'
+import { DEMO_MODE } from '../../config/demo.js'
 
 /**
  * Podcast session state lifted to the WorkspaceShell so both the center
@@ -43,20 +44,63 @@ function estimateTurnDuration(text) {
   return Math.max(2, Math.round(text.length / 13))
 }
 
+/**
+ * Drive the podcast progress SSE stream, invoking callbacks as events arrive.
+ * Throws on transport failure (caller decides whether to fall back).
+ */
+async function streamPodcastProgress(docId, { signal, onOpen, onScriptReady, onTurn, onDone, onError }) {
+  const qs = new URLSearchParams()
+  qs.set('token', getToken() || '')
+  const res = await fetch(`${apiBase}/api/podcast/${docId}/progress?${qs.toString()}`, {
+    headers: { Accept: 'text/event-stream' },
+    signal,
+  })
+  onOpen?.()
+  if (!res.ok || !res.body) throw new Error(`progress HTTP ${res.status}`)
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let buf = ''
+  for (;;) {
+    const { value, done } = await reader.read()
+    if (done) break
+    buf += decoder.decode(value, { stream: true })
+    let sep
+    while ((sep = buf.indexOf('\n\n')) !== -1) {
+      const frame = buf.slice(0, sep)
+      buf = buf.slice(sep + 2)
+      const line = frame.split('\n').find((l) => l.startsWith('data:'))
+      if (!line) continue
+      let evt
+      try { evt = JSON.parse(line.slice(5).trim()) } catch { continue }
+      if (evt.type === 'script_ready') onScriptReady?.(evt.total_turns)
+      else if (evt.type === 'turn_ready') onTurn?.(evt)
+      else if (evt.type === 'done') onDone?.()
+      else if (evt.type === 'error') onError?.(evt.message || 'stream error')
+    }
+  }
+}
+
 export function PodcastSessionProvider({ children }) {
   const { docId } = useParams()
   const [turns, setTurns] = useState([])
   const [status, setStatus] = useState('idle')        // idle | generating | ready | error
   const [errorMsg, setErrorMsg] = useState('')
   const [busy, setBusy] = useState(false)
+  const [progress, setProgress] = useState({ done: 0, total: 0 }) // turns synthesized / total
+  const abortRef = useRef(null)
 
-  // Reset on doc change.
+  // Reset on doc change (and abort any in-flight progress stream).
   useEffect(() => {
+    if (abortRef.current) { abortRef.current.abort(); abortRef.current = null }
     setTurns([])
     setStatus('idle')
     setErrorMsg('')
     setBusy(false)
+    setProgress({ done: 0, total: 0 })
   }, [docId])
+
+  // Abort the stream on unmount.
+  useEffect(() => () => { if (abortRef.current) abortRef.current.abort() }, [])
 
   // Probe for an existing podcast script for this doc.
   useEffect(() => {
@@ -144,29 +188,101 @@ export function PodcastSessionProvider({ children }) {
 
   const handleGenerate = useCallback(async () => {
     if (!docId) return
+    if (abortRef.current) abortRef.current.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+    const alive = () => !controller.signal.aborted
+
     setErrorMsg('')
     setBusy(true)
     setStatus('generating')
-    try {
-      const res = await generatePodcast(docId)
-      setTurns(res.turns || [])
-      setStatus('ready')
-    } catch (err) {
-      const m = err?.message || String(err)
-      setErrorMsg(m)
-      setStatus('idle')
-    } finally {
-      setBusy(false)
+    setTurns([])
+    setProgress({ done: 0, total: 0 })
+
+    // Demo mode: no backend — simulate the transcript building line by line.
+    if (DEMO_MODE) {
+      try {
+        const res = await generatePodcast(docId)
+        const all = res.turns || []
+        if (!alive()) return
+        setProgress({ done: 0, total: all.length })
+        for (let i = 0; i < all.length; i++) {
+          if (!alive()) return
+          setTurns((prev) => [...prev, { speaker: all[i].speaker, text: all[i].text }])
+          setProgress({ done: i + 1, total: all.length })
+          await new Promise((r) => setTimeout(r, 160))
+        }
+        if (!alive()) return
+        setStatus('ready')
+      } catch (err) {
+        if (!alive()) return
+        setErrorMsg(err?.message || String(err)); setStatus('error')
+      } finally {
+        if (alive()) setBusy(false)
+      }
+      return
     }
+
+    // Fallback: the blocking generate endpoint (whole script at once).
+    const runFallback = () => {
+      const fb = new AbortController()
+      abortRef.current = fb
+      ;(async () => {
+        try {
+          const res = await generatePodcast(docId)
+          if (fb.signal.aborted) return
+          const all = res.turns || []
+          setTurns(all)
+          setProgress({ done: all.length, total: all.length })
+          setStatus('ready')
+        } catch (err) {
+          if (fb.signal.aborted) return
+          setErrorMsg(err?.message || String(err)); setStatus('error')
+        } finally {
+          if (!fb.signal.aborted) setBusy(false)
+        }
+      })()
+    }
+
+    let gotResponse = false
+    const watchdog = setTimeout(() => {
+      if (!gotResponse && alive()) { controller.abort(); runFallback() }
+    }, 3000)
+
+    try {
+      await streamPodcastProgress(docId, {
+        signal: controller.signal,
+        onOpen: () => { gotResponse = true; clearTimeout(watchdog) },
+        onScriptReady: (total) => { if (alive()) setProgress((p) => ({ ...p, total })) },
+        onTurn: (evt) => {
+          if (!alive()) return
+          setTurns((prev) => {
+            const next = prev.slice()
+            next[evt.turn_index] = { speaker: evt.speaker, text: evt.text }
+            return next
+          })
+          setProgress((p) => ({ done: evt.turn_index + 1, total: p.total || evt.turn_index + 1 }))
+        },
+        onDone: () => { if (alive()) { setStatus('ready'); setBusy(false) } },
+        onError: (msg) => { if (alive()) { setErrorMsg(msg); setStatus('error'); setBusy(false) } },
+      })
+      if (alive() && status !== 'error') { /* stream closed; done/error already handled */ }
+    } catch (err) {
+      clearTimeout(watchdog)
+      if (!alive()) return // aborted by watchdog (fallback running) or doc change
+      if (!gotResponse) runFallback() // transport failure → blocking generate
+      else { setErrorMsg(err?.message || String(err)); setStatus('error'); setBusy(false) }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [docId])
 
   const value = useMemo(() => ({
     docId,
-    turns, status, errorMsg, busy,
+    turns, status, errorMsg, busy, progress,
     chapters, audio,
     generate: handleGenerate,
     seekTurn: (i) => audio.seekChapter(i, 0),
-  }), [docId, turns, status, errorMsg, busy, chapters, audio, handleGenerate])
+  }), [docId, turns, status, errorMsg, busy, progress, chapters, audio, handleGenerate])
 
   return <PodcastCtx.Provider value={value}>{children}</PodcastCtx.Provider>
 }

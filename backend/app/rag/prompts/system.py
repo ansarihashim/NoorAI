@@ -53,6 +53,17 @@ _STREAM_OUTPUT_RULES = """OUTPUT RULES (STREAMING — JSON Lines):
 GROUNDED_SYSTEM_STREAM = GROUNDED_SYSTEM.split("OUTPUT RULES:")[0] + _STREAM_OUTPUT_RULES
 
 
+# Prose variant: same grounding + injection rules, but the model writes plain
+# flowing prose (used by the token-streamed Simplest-Explanation typing effect,
+# where there is nothing to parse — the text IS the output).
+_PROSE_OUTPUT_RULES = """OUTPUT RULES (PROSE):
+- Output plain prose only. No JSON, no markdown fences, no headings, no bullet lists, no code blocks.
+- Just the explanation text itself, ready to read straight through.
+"""
+
+GROUNDED_SYSTEM_PROSE = GROUNDED_SYSTEM.split("OUTPUT RULES:")[0] + _PROSE_OUTPUT_RULES
+
+
 # Width of an injection-defence boundary marker. The LLM is told above to
 # treat anything between these tags as data; we wrap retrieved context so
 # even a chunk that begins with "Ignore previous instructions" is bracketed

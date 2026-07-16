@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { deleteQuiz, generateQuiz, getQuiz } from '../../lib/api.js'
+import { getQuiz } from '../../lib/api.js'
+import useRevisionStream from '../../hooks/useRevisionStream.js'
 import { useCitations } from '../../lib/citations.jsx'
 import { useToast } from '../ui/Toast.jsx'
 import Button from '../ui/Button.jsx'
 import Dialog from '../ui/Dialog.jsx'
 import Skeleton from '../ui/Skeleton.jsx'
+import StreamingList from './StreamingList.jsx'
 
 const N_OPTIONS = [8, 12, 16, 24]
 
@@ -19,12 +21,16 @@ export default function QuizView({ docId, action }) {
   const toast = useToast()
   const citations = useCitations()
   const [quiz, setQuiz] = useState(null) // null=loading, undefined=none, QuizSet=loaded
-  const [busy, setBusy] = useState(false)
   const [n, setN] = useState(12)
   const [confirmRegen, setConfirmRegen] = useState(false)
+  const [streaming, setStreaming] = useState(false)
   const [idx, setIdx] = useState(0)
   const [picked, setPicked] = useState({})       // { [questionIdx]: optionIdx }
   const [revealed, setRevealed] = useState(new Set()) // questionIdx revealed
+
+  const {
+    items: streamItems, isStreaming, isDone, error, total, startStream, reset,
+  } = useRevisionStream(docId, 'quiz')
 
   useEffect(() => {
     if (!docId) return
@@ -43,47 +49,40 @@ export default function QuizView({ docId, action }) {
     return () => { cancelled = true }
   }, [docId, toast])
 
-  const onGenerate = useCallback(async () => {
-    if (busy) return
-    setBusy(true)
-    try {
-      const q = await generateQuiz(docId, { n, force: quiz != null })
-      setQuiz(q); setIdx(0); setPicked({}); setRevealed(new Set())
-      toast.success('Quiz ready', `${q.questions.length} questions generated`)
-    } catch (err) {
-      toast.error('Generation failed', err?.message || String(err))
-    } finally {
-      setBusy(false); setConfirmRegen(false)
-    }
-  }, [busy, n, docId, quiz, toast])
+  // Stream finished → load the canonical saved set (fallback to streamed items).
+  useEffect(() => {
+    if (!streaming || !isDone) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const q = await getQuiz(docId)
+        if (!cancelled) { setQuiz(q); setIdx(0); setPicked({}); setRevealed(new Set()) }
+      } catch {
+        if (!cancelled && streamItems.length) {
+          setQuiz({ title: quiz?.title || 'Quiz', questions: streamItems })
+          setIdx(0); setPicked({}); setRevealed(new Set())
+        }
+      }
+      if (!cancelled) setStreaming(false)
+    })()
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDone, streaming])
 
-  const onRegen = useCallback(() => {
-    if (quiz) setConfirmRegen(true)
-    else onGenerate()
-  }, [quiz, onGenerate])
+  const beginStream = useCallback((opts) => { setStreaming(true); startStream(opts) }, [startStream])
+  const onGenerate = useCallback(() => { if (!streaming) beginStream({ n }) }, [streaming, n, beginStream])
+  const onRegen = useCallback(() => { if (quiz) setConfirmRegen(true); else onGenerate() }, [quiz, onGenerate])
+  const performRegen = useCallback(() => { setConfirmRegen(false); beginStream({ n, force: true }) }, [n, beginStream])
+  const onTryAgain = useCallback(() => { reset(); beginStream({ n }) }, [reset, n, beginStream])
 
   // Right-rail "Start quiz" trigger.
   useEffect(() => {
     if (!action || !action.generate) return
-    if (busy || quiz === null) return
+    if (streaming || quiz === null) return
     if (quiz === undefined) onGenerate()
     else setConfirmRegen(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [action])
-
-  const performRegen = useCallback(async () => {
-    setBusy(true)
-    try {
-      try { await deleteQuiz(docId) } catch {}
-      const q = await generateQuiz(docId, { n, force: true })
-      setQuiz(q); setIdx(0); setPicked({}); setRevealed(new Set())
-      toast.success('Quiz regenerated', `${q.questions.length} questions`)
-    } catch (err) {
-      toast.error('Regeneration failed', err?.message)
-    } finally {
-      setBusy(false); setConfirmRegen(false)
-    }
-  }, [docId, n, toast])
 
   const stats = useMemo(() => {
     if (!quiz) return { answered: 0, correct: 0, total: 0 }
@@ -101,7 +100,7 @@ export default function QuizView({ docId, action }) {
     }
   }, [quiz, revealed, picked])
 
-  if (quiz === null) {
+  if (quiz === null && !streaming) {
     return (
       <div className="grid place-items-center py-16">
         <div className="w-full max-w-2xl space-y-4">
@@ -112,8 +111,31 @@ export default function QuizView({ docId, action }) {
     )
   }
 
+  if (streaming) {
+    return (
+      <StreamingList
+        label="quiz"
+        items={streamItems}
+        isStreaming={isStreaming}
+        isDone={isDone}
+        error={error}
+        total={total}
+        onTryAgain={onTryAgain}
+        noneLabel="No questions were produced."
+        renderItem={(qq) => (
+          <>
+            <p className="text-[0.9rem] font-medium leading-snug text-ink">{qq.question}</p>
+            <p className="mt-1.5 text-[0.75rem] uppercase tracking-[0.08em] text-ink-faint">
+              {TYPE_LABEL[qq.type] || qq.type}
+            </p>
+          </>
+        )}
+      />
+    )
+  }
+
   if (quiz === undefined) {
-    return <EmptyState n={n} onN={setN} busy={busy} onGenerate={onGenerate} />
+    return <EmptyState n={n} onN={setN} onGenerate={onGenerate} />
   }
 
   const q = quiz.questions[idx]
@@ -135,8 +157,8 @@ export default function QuizView({ docId, action }) {
           </h2>
         </div>
         <div className="flex items-center gap-2">
-          <NPill value={n} onChange={setN} disabled={busy} />
-          <Button onClick={onRegen} loading={busy} variant="secondary" size="sm">
+          <NPill value={n} onChange={setN} disabled={false} />
+          <Button onClick={onRegen} variant="secondary" size="sm">
             Regenerate
           </Button>
         </div>
@@ -265,13 +287,13 @@ export default function QuizView({ docId, action }) {
 
       <Dialog
         open={confirmRegen}
-        onClose={() => !busy && setConfirmRegen(false)}
+        onClose={() => setConfirmRegen(false)}
         title="Regenerate the quiz?"
         description={`This replaces the ${quiz.questions.length}-question quiz with a fresh ${n}-question one. Your score on the current quiz will reset.`}
       >
         <div className="mt-2 flex justify-end gap-2">
-          <Button variant="ghost" onClick={() => setConfirmRegen(false)} disabled={busy}>Cancel</Button>
-          <Button variant="primary" loading={busy} onClick={performRegen}>Regenerate</Button>
+          <Button variant="ghost" onClick={() => setConfirmRegen(false)}>Cancel</Button>
+          <Button variant="primary" onClick={performRegen}>Regenerate</Button>
         </div>
       </Dialog>
     </div>
@@ -331,7 +353,7 @@ function NPill({ value, onChange, disabled }) {
   )
 }
 
-function EmptyState({ n, onN, busy, onGenerate }) {
+function EmptyState({ n, onN, onGenerate }) {
   return (
     <div className="grid place-items-center py-16 text-center">
       <div className="max-w-md">
@@ -348,8 +370,8 @@ function EmptyState({ n, onN, busy, onGenerate }) {
           Mix of MCQs, conceptual prompts, and assertion-reason — every answer cites the chunks it came from.
         </p>
         <div className="mt-6 inline-flex items-center gap-3">
-          <NPill value={n} onChange={onN} disabled={busy} />
-          <Button onClick={onGenerate} loading={busy} size="lg">
+          <NPill value={n} onChange={onN} disabled={false} />
+          <Button onClick={onGenerate} size="lg">
             Generate {n} questions
           </Button>
         </div>

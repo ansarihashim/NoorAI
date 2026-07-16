@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { motion } from 'framer-motion'
 import { usePodcastSession } from './PodcastSessionContext.jsx'
 
 /**
@@ -28,14 +29,14 @@ export default function PodcastTranscriptPanel() {
     <div className="flex h-full flex-col border-l border-rule">
       <div className="flex items-center justify-between border-b border-rule px-3 py-2.5">
         <span className="eyebrow">Transcript</span>
-        {status === 'ready' && turns.length > 0 && (
+        {turns.length > 0 && (
           <span className="text-[0.7rem] text-ink-dim">{turns.length} turns</span>
         )}
       </div>
 
-      {(status !== 'ready' || turns.length === 0) ? (
+      {turns.length === 0 ? (
         <div className="px-3 py-4 text-[0.8125rem] text-ink-dim">
-          The transcript appears here once a discussion has been generated.
+          The transcript builds here line by line as the discussion is generated.
         </div>
       ) : (
         <div
@@ -44,18 +45,23 @@ export default function PodcastTranscriptPanel() {
         >
           <ul className="space-y-3">
             {turns.map((t, i) => {
-              const active = i === currentIdx
-              const past = i < currentIdx
+              const ready = status === 'ready'
+              const active = ready && i === currentIdx
+              const past = ready && i < currentIdx
               const isGuest = t.speaker === 'guest'
               return (
-                <li
+                <motion.li
                   key={i}
                   ref={active ? activeRef : null}
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.2 }}
                   className={[
-                    'cursor-pointer transition-opacity',
+                    'transition-opacity',
+                    ready ? 'cursor-pointer' : 'cursor-default',
                     active ? 'opacity-100' : past ? 'opacity-50 hover:opacity-75' : 'opacity-80 hover:opacity-100',
                   ].join(' ')}
-                  onClick={() => seekTurn(i)}
+                  onClick={() => { if (ready) seekTurn(i) }}
                 >
                   <div className="mb-1 flex items-center gap-1.5">
                     <span className={[
@@ -80,7 +86,7 @@ export default function PodcastTranscriptPanel() {
                   >
                     {t.text}
                   </p>
-                </li>
+                </motion.li>
               )
             })}
           </ul>

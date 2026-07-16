@@ -90,4 +90,22 @@ async def astream_jsonl_items(
             yield item
 
 
-__all__ = ["astream_jsonl_items"]
+async def astream_tokens(
+    chain: Runnable,
+    inputs: dict[str, Any],
+) -> AsyncIterator[str]:
+    """Drive ``chain.astream(inputs)`` and yield raw text tokens as they arrive.
+
+    Used by the token-streamed Preparation endpoints (Overview JSON typing +
+    Explanation prose typing). No parsing — the caller/frontend handles the
+    accumulated text. Only raises on a genuine stream/transport failure.
+    """
+    async for chunk in chain.astream(inputs):
+        text = getattr(chunk, "content", chunk)
+        if not isinstance(text, str):
+            text = str(text)
+        if text:
+            yield text
+
+
+__all__ = ["astream_jsonl_items", "astream_tokens"]

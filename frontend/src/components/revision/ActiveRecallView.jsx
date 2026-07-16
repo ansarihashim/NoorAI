@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { deleteRecall, generateRecall, getRecall } from '../../lib/api.js'
+import { getRecall } from '../../lib/api.js'
+import useRevisionStream from '../../hooks/useRevisionStream.js'
 import { useCitations } from '../../lib/citations.jsx'
 import { useToast } from '../ui/Toast.jsx'
 import Button from '../ui/Button.jsx'
 import Dialog from '../ui/Dialog.jsx'
 import Skeleton from '../ui/Skeleton.jsx'
+import StreamingList from './StreamingList.jsx'
 
 const N_OPTIONS = [8, 12, 16, 24]
 
@@ -27,12 +29,16 @@ export default function ActiveRecallView({ docId, action }) {
   const toast = useToast()
   const citations = useCitations()
   const [set, setSet] = useState(null)
-  const [busy, setBusy] = useState(false)
   const [n, setN] = useState(12)
   const [confirmRegen, setConfirmRegen] = useState(false)
+  const [streaming, setStreaming] = useState(false)
   const [idx, setIdx] = useState(0)
   const [revealed, setRevealed] = useState(new Set())
   const [userAnswer, setUserAnswer] = useState({})
+
+  const {
+    items: streamItems, isStreaming, isDone, error, total, startStream, reset,
+  } = useRevisionStream(docId, 'recall')
 
   useEffect(() => {
     if (!docId) return
@@ -51,49 +57,41 @@ export default function ActiveRecallView({ docId, action }) {
     return () => { cancelled = true }
   }, [docId, toast])
 
-  const onGenerate = useCallback(async () => {
-    if (busy) return
-    setBusy(true)
-    try {
-      const r = await generateRecall(docId, { n, force: set != null })
-      setSet(r); setIdx(0); setRevealed(new Set()); setUserAnswer({})
-      toast.success('Recall set ready', `${r.prompts.length} prompts generated`)
-    } catch (err) {
-      toast.error('Generation failed', err?.message || String(err))
-    } finally {
-      setBusy(false); setConfirmRegen(false)
-    }
-  }, [busy, n, docId, set, toast])
+  useEffect(() => {
+    if (!streaming || !isDone) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const r = await getRecall(docId)
+        if (!cancelled) { setSet(r); setIdx(0); setRevealed(new Set()); setUserAnswer({}) }
+      } catch {
+        if (!cancelled && streamItems.length) {
+          setSet({ title: set?.title || 'Active Recall', prompts: streamItems })
+          setIdx(0); setRevealed(new Set()); setUserAnswer({})
+        }
+      }
+      if (!cancelled) setStreaming(false)
+    })()
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDone, streaming])
 
-  const onRegen = useCallback(() => {
-    if (set) setConfirmRegen(true)
-    else onGenerate()
-  }, [set, onGenerate])
+  const beginStream = useCallback((opts) => { setStreaming(true); startStream(opts) }, [startStream])
+  const onGenerate = useCallback(() => { if (!streaming) beginStream({ n }) }, [streaming, n, beginStream])
+  const onRegen = useCallback(() => { if (set) setConfirmRegen(true); else onGenerate() }, [set, onGenerate])
+  const performRegen = useCallback(() => { setConfirmRegen(false); beginStream({ n, force: true }) }, [n, beginStream])
+  const onTryAgain = useCallback(() => { reset(); beginStream({ n }) }, [reset, n, beginStream])
 
   // Right-rail "Active recall" trigger.
   useEffect(() => {
     if (!action || !action.generate) return
-    if (busy || set === null) return
+    if (streaming || set === null) return
     if (set === undefined) onGenerate()
     else setConfirmRegen(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [action])
 
-  const performRegen = useCallback(async () => {
-    setBusy(true)
-    try {
-      try { await deleteRecall(docId) } catch {}
-      const r = await generateRecall(docId, { n, force: true })
-      setSet(r); setIdx(0); setRevealed(new Set()); setUserAnswer({})
-      toast.success('Regenerated', `${r.prompts.length} prompts`)
-    } catch (err) {
-      toast.error('Regeneration failed', err?.message)
-    } finally {
-      setBusy(false); setConfirmRegen(false)
-    }
-  }, [docId, n, toast])
-
-  if (set === null) {
+  if (set === null && !streaming) {
     return (
       <div className="grid place-items-center py-16">
         <div className="w-full max-w-2xl space-y-4">
@@ -104,8 +102,31 @@ export default function ActiveRecallView({ docId, action }) {
     )
   }
 
+  if (streaming) {
+    return (
+      <StreamingList
+        label="active recall"
+        items={streamItems}
+        isStreaming={isStreaming}
+        isDone={isDone}
+        error={error}
+        total={total}
+        onTryAgain={onTryAgain}
+        noneLabel="No prompts were produced."
+        renderItem={(pp) => (
+          <>
+            <p className="text-[0.9rem] font-medium leading-snug text-ink">{pp.prompt}</p>
+            <p className="mt-1.5 text-[0.75rem] uppercase tracking-[0.08em] text-ink-faint">
+              {KIND_LABEL[pp.kind] || pp.kind}
+            </p>
+          </>
+        )}
+      />
+    )
+  }
+
   if (set === undefined) {
-    return <EmptyState n={n} onN={setN} busy={busy} onGenerate={onGenerate} />
+    return <EmptyState n={n} onN={setN} onGenerate={onGenerate} />
   }
 
   const p = set.prompts[idx]
@@ -121,8 +142,8 @@ export default function ActiveRecallView({ docId, action }) {
           </h2>
         </div>
         <div className="flex items-center gap-2">
-          <NPill value={n} onChange={setN} disabled={busy} />
-          <Button onClick={onRegen} loading={busy} variant="secondary" size="sm">Regenerate</Button>
+          <NPill value={n} onChange={setN} disabled={false} />
+          <Button onClick={onRegen} variant="secondary" size="sm">Regenerate</Button>
         </div>
       </div>
 
@@ -215,13 +236,13 @@ export default function ActiveRecallView({ docId, action }) {
 
       <Dialog
         open={confirmRegen}
-        onClose={() => !busy && setConfirmRegen(false)}
+        onClose={() => setConfirmRegen(false)}
         title="Regenerate the recall set?"
         description={`This replaces ${set.prompts.length} prompts with ${n} fresh ones.`}
       >
         <div className="mt-2 flex justify-end gap-2">
-          <Button variant="ghost" onClick={() => setConfirmRegen(false)} disabled={busy}>Cancel</Button>
-          <Button variant="primary" loading={busy} onClick={performRegen}>Regenerate</Button>
+          <Button variant="ghost" onClick={() => setConfirmRegen(false)}>Cancel</Button>
+          <Button variant="primary" onClick={performRegen}>Regenerate</Button>
         </div>
       </Dialog>
     </div>
@@ -250,7 +271,7 @@ function NPill({ value, onChange, disabled }) {
   )
 }
 
-function EmptyState({ n, onN, busy, onGenerate }) {
+function EmptyState({ n, onN, onGenerate }) {
   return (
     <div className="grid place-items-center py-16 text-center">
       <div className="max-w-md">
@@ -267,8 +288,8 @@ function EmptyState({ n, onN, busy, onGenerate }) {
           A mix of conceptual prompts, fill-in-the-blanks, and "explain it back" exercises — every prompt grounded in your notes.
         </p>
         <div className="mt-6 inline-flex items-center gap-3">
-          <NPill value={n} onChange={onN} disabled={busy} />
-          <Button onClick={onGenerate} loading={busy} size="lg">Generate {n} prompts</Button>
+          <NPill value={n} onChange={onN} disabled={false} />
+          <Button onClick={onGenerate} size="lg">Generate {n} prompts</Button>
         </div>
       </div>
     </div>

@@ -6,9 +6,12 @@ cached script before pressing play.
 """
 from __future__ import annotations
 
+import asyncio
+import json
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,6 +23,7 @@ from app.services import podcast as podcast_service
 from app.rag.service import get_rag
 from app.services.tts import get_tts
 from app.auth.deps import get_current_user, get_current_user_from_query_or_header
+from app.utils.rate_limit import limit_dep, LIMIT_AI_HEAVY
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -135,4 +139,79 @@ async def turn_audio(
             "Cache-Control": "private, max-age=86400",
             "Accept-Ranges": "bytes",
         },
+    )
+
+
+# ---------------------------------------------------------------------------
+# Progress stream (SSE)
+#
+# Drives the "generate podcast" UX: the transcript builds line by line as each
+# turn's audio becomes available. JWT via ?token= (SSE can't set headers).
+# CORS is inherited from the app-level middleware — no manual CORS headers.
+#
+#   data: {"type":"script_ready","total_turns":N}\n\n
+#   data: {"type":"turn_ready","turn_index":0,"speaker":"host","text":"..."}\n\n
+#   data: {"type":"done"}\n\n
+#   data: {"type":"error","message":"..."}\n\n
+
+_SSE_HEADERS = {
+    "Cache-Control": "no-cache",
+    "X-Accel-Buffering": "no",
+    "Connection": "keep-alive",
+}
+
+
+def _sse(payload: dict) -> str:
+    return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+
+
+async def _run_podcast_progress(doc_id: str):
+    try:
+        # Ensure the script exists (cached after first run). generate_script is
+        # a no-op read when already present.
+        try:
+            script = await podcast_service.generate_script(doc_id)
+        except FileNotFoundError as exc:
+            yield _sse({"type": "error", "message": str(exc)})
+            return
+
+        yield _sse({"type": "script_ready", "total_turns": len(script.turns)})
+
+        for idx, turn in enumerate(script.turns):
+            # Cached turn → announce immediately; uncached → synthesize first so
+            # the audio is ready by the time the client plays it.
+            if not podcast_service.turn_cached(doc_id, idx):
+                try:
+                    await podcast_service.ensure_turn_audio(doc_id, idx)
+                except Exception as exc:
+                    # Audio failed (rare — TTS falls back to free Edge). Still
+                    # surface the turn so the transcript keeps building; the
+                    # audio route will retry/handle on play.
+                    logger.warning("podcast progress: turn %d synth failed: %s", idx, exc)
+            yield _sse({
+                "type": "turn_ready",
+                "turn_index": idx,
+                "speaker": turn.speaker,
+                "text": turn.text,
+            })
+
+        yield _sse({"type": "done"})
+    except Exception as exc:
+        logger.exception("podcast progress failed for %s", doc_id)
+        yield _sse({"type": "error", "message": str(exc)})
+
+
+@router.get("/{doc_id}/progress", dependencies=[Depends(limit_dep(LIMIT_AI_HEAVY))])
+async def podcast_progress(
+    doc_id: str,
+    user: User = Depends(get_current_user_from_query_or_header),
+    db: AsyncSession = Depends(get_session),
+) -> StreamingResponse:
+    if not get_rag().exists(doc_id):
+        raise HTTPException(status_code=404, detail="doc not found")
+    await _ensure_doc_owner(db, doc_id, user)
+    return StreamingResponse(
+        _run_podcast_progress(doc_id),
+        media_type="text/event-stream",
+        headers=_SSE_HEADERS,
     )

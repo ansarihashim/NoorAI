@@ -1,16 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import {
-  deleteImportantQuestions,
-  generateImportantQuestions,
-  getImportantQuestions,
-} from '../../lib/api.js'
+import { getImportantQuestions } from '../../lib/api.js'
+import usePreparationStream from '../../hooks/usePreparationStream.js'
 import { useMultiDocCitations, format as formatCitation } from '../../lib/citations.jsx'
 import { useToast } from '../ui/Toast.jsx'
 import Button from '../ui/Button.jsx'
 import Dialog from '../ui/Dialog.jsx'
 import Skeleton from '../ui/Skeleton.jsx'
-import GenerationProgress, { QUESTIONS_STAGES } from '../ui/GenerationProgress.jsx'
+import StreamingList from '../revision/StreamingList.jsx'
 
 const N_OPTIONS = [8, 10, 15, 20]
 
@@ -25,10 +22,14 @@ export default function ImportantQuestionsView({ docIds, action }) {
   const toast = useToast()
   const citationsByDoc = useMultiDocCitations(docIds)
   const [set, setSet] = useState(null)
-  const [busy, setBusy] = useState(false)
   const [n, setN] = useState(10)
   const [confirmRegen, setConfirmRegen] = useState(false)
+  const [streaming, setStreaming] = useState(false)
   const [open, setOpen] = useState(new Set([0]))
+
+  const {
+    items: streamItems, isStreaming, isDone, error, total, startStream, reset,
+  } = usePreparationStream(docIds, 'questions')
 
   useEffect(() => {
     if (!docIds || docIds.length === 0) return
@@ -49,51 +50,41 @@ export default function ImportantQuestionsView({ docIds, action }) {
     return () => { cancelled = true }
   }, [docIds.join('|'), toast])
 
-  const onGenerate = useCallback(async () => {
-    if (busy) return
-    setBusy(true)
-    try {
-      const r = await generateImportantQuestions(docIds, { n, force: set != null })
-      setSet(r)
-      setOpen(new Set([0]))
-      toast.success('Questions ready', `${r.questions.length} questions`)
-    } catch (err) {
-      toast.error('Generation failed', err?.message || String(err))
-    } finally {
-      setBusy(false); setConfirmRegen(false)
-    }
-  }, [busy, n, docIds, set, toast])
+  // Stream finished → load the canonical saved set (fallback to streamed items).
+  useEffect(() => {
+    if (!streaming || !isDone) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const r = await getImportantQuestions(docIds)
+        if (!cancelled) { setSet(r); setOpen(new Set([0])) }
+      } catch {
+        if (!cancelled && streamItems.length) {
+          setSet({ title: set?.title || 'Important Questions', questions: streamItems })
+          setOpen(new Set([0]))
+        }
+      }
+      if (!cancelled) setStreaming(false)
+    })()
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDone, streaming])
 
-  const onRegen = useCallback(() => {
-    if (set) setConfirmRegen(true)
-    else onGenerate()
-  }, [set, onGenerate])
+  const beginStream = useCallback((opts) => { setStreaming(true); startStream(opts) }, [startStream])
+  const onGenerate = useCallback(() => { if (!streaming) beginStream({ n }) }, [streaming, n, beginStream])
+  const onRegen = useCallback(() => { if (set) setConfirmRegen(true); else onGenerate() }, [set, onGenerate])
+  const performRegen = useCallback(() => { setConfirmRegen(false); beginStream({ n, force: true }) }, [n, beginStream])
+  const onTryAgain = useCallback(() => { reset(); beginStream({ n }) }, [reset, n, beginStream])
 
   // Right-rail "Important questions" / "Predict the paper" actions.
   useEffect(() => {
     if (!action) return
     if (action.action !== 'important-questions' && action.action !== 'predict-paper') return
-    if (busy) return
-    if (set === null) return
+    if (streaming || set === null) return
     if (set === undefined) onGenerate()
     else setConfirmRegen(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [action])
-
-  const performRegen = useCallback(async () => {
-    setBusy(true)
-    try {
-      try { await deleteImportantQuestions(docIds) } catch {}
-      const r = await generateImportantQuestions(docIds, { n, force: true })
-      setSet(r)
-      setOpen(new Set([0]))
-      toast.success('Regenerated', `${r.questions.length} questions`)
-    } catch (err) {
-      toast.error('Regeneration failed', err?.message)
-    } finally {
-      setBusy(false); setConfirmRegen(false)
-    }
-  }, [docIds, n, toast])
 
   const toggle = (i) => {
     setOpen((cur) => {
@@ -103,7 +94,7 @@ export default function ImportantQuestionsView({ docIds, action }) {
     })
   }
 
-  if (set === null) {
+  if (set === null && !streaming) {
     return (
       <div className="space-y-3">
         <Skeleton className="h-8 w-1/3" />
@@ -113,8 +104,29 @@ export default function ImportantQuestionsView({ docIds, action }) {
     )
   }
 
+  if (streaming) {
+    return (
+      <StreamingList
+        label="important questions"
+        items={streamItems}
+        isStreaming={isStreaming}
+        isDone={isDone}
+        error={error}
+        total={total}
+        onTryAgain={onTryAgain}
+        noneLabel="No questions were produced."
+        renderItem={(q) => (
+          <>
+            <p className="line-clamp-2 text-[0.9rem] font-medium leading-snug text-ink">{q.question}</p>
+            <p className="mt-1.5 text-[0.7rem] uppercase tracking-[0.08em] text-ink-faint">{q.type}</p>
+          </>
+        )}
+      />
+    )
+  }
+
   if (set === undefined) {
-    return <EmptyState n={n} onN={setN} busy={busy} onGenerate={onGenerate} nDocs={docIds.length} />
+    return <EmptyState n={n} onN={setN} onGenerate={onGenerate} nDocs={docIds.length} />
   }
 
   return (
@@ -127,8 +139,8 @@ export default function ImportantQuestionsView({ docIds, action }) {
           </h2>
         </div>
         <div className="flex items-center gap-2">
-          <NPill value={n} onChange={setN} disabled={busy} />
-          <Button onClick={onRegen} loading={busy} variant="secondary" size="sm">Regenerate</Button>
+          <NPill value={n} onChange={setN} disabled={false} />
+          <Button onClick={onRegen} variant="secondary" size="sm">Regenerate</Button>
         </div>
       </div>
 
@@ -218,13 +230,13 @@ export default function ImportantQuestionsView({ docIds, action }) {
 
       <Dialog
         open={confirmRegen}
-        onClose={() => !busy && setConfirmRegen(false)}
+        onClose={() => setConfirmRegen(false)}
         title="Regenerate questions?"
         description={`This replaces ${set.questions.length} questions with ${n} fresh ones.`}
       >
         <div className="mt-2 flex justify-end gap-2">
-          <Button variant="ghost" onClick={() => setConfirmRegen(false)} disabled={busy}>Cancel</Button>
-          <Button variant="primary" loading={busy} onClick={performRegen}>Regenerate</Button>
+          <Button variant="ghost" onClick={() => setConfirmRegen(false)}>Cancel</Button>
+          <Button variant="primary" onClick={performRegen}>Regenerate</Button>
         </div>
       </Dialog>
     </div>
@@ -269,7 +281,7 @@ function NPill({ value, onChange, disabled }) {
   )
 }
 
-function EmptyState({ n, onN, busy, onGenerate, nDocs }) {
+function EmptyState({ n, onN, onGenerate, nDocs }) {
   return (
     <div className="grid place-items-center py-16 text-center">
       <div className="max-w-md">
@@ -280,25 +292,17 @@ function EmptyState({ n, onN, busy, onGenerate, nDocs }) {
           </svg>
         </div>
         <h3 className="mt-5 font-display text-xl font-semibold text-ink">
-          {busy ? `Writing ${n} predicted questions…` : 'Predicted exam questions, grounded.'}
+          Predicted exam questions, grounded.
         </h3>
-        {!busy && (
-          <p className="mx-auto mt-2 max-w-sm text-pretty text-sm text-ink-muted">
-            {nDocs > 1
-              ? `Spans all ${nDocs} selected documents — every answer cites the chunks it drew from.`
-              : 'Every answer cites the chunks it drew from. Confidence calibrated by the model.'}
-          </p>
-        )}
-        {busy ? (
-          <div className="mt-6">
-            <GenerationProgress active stages={QUESTIONS_STAGES} />
-          </div>
-        ) : (
-          <div className="mt-6 inline-flex items-center gap-3">
-            <NPill value={n} onChange={onN} disabled={busy} />
-            <Button onClick={onGenerate} loading={busy} size="lg">Generate {n} questions</Button>
-          </div>
-        )}
+        <p className="mx-auto mt-2 max-w-sm text-pretty text-sm text-ink-muted">
+          {nDocs > 1
+            ? `Spans all ${nDocs} selected documents — every answer cites the chunks it drew from.`
+            : 'Every answer cites the chunks it drew from. Confidence calibrated by the model.'}
+        </p>
+        <div className="mt-6 inline-flex items-center gap-3">
+          <NPill value={n} onChange={onN} disabled={false} />
+          <Button onClick={onGenerate} size="lg">Generate {n} questions</Button>
+        </div>
       </div>
     </div>
   )

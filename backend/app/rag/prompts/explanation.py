@@ -1,7 +1,7 @@
 """Prompt template for the simplest-explanation chain."""
 from langchain_core.prompts import ChatPromptTemplate
 
-from app.rag.prompts.system import GROUNDED_SYSTEM
+from app.rag.prompts.system import GROUNDED_SYSTEM, GROUNDED_SYSTEM_PROSE
 
 _TASK = """Explain the topic "{topic}" the way a brilliant tutor explains it to a peer who has never seen it before. Ground every claim in the NOTES.
 
@@ -31,4 +31,29 @@ Return a single JSON object matching the SimpleExplanation schema."""
 EXPLANATION_PROMPT = ChatPromptTemplate.from_messages([
     ("system", GROUNDED_SYSTEM),
     ("user", _TASK),
+])
+
+
+# --- Streaming (prose) variant -------------------------------------------------
+# The streamed explanation is displayed as a live typing effect, so the model
+# writes plain flowing prose (no JSON to parse). Same grounding as _TASK, minus
+# the structured fields (analogies/examples/chunks) which don't fit a typewriter.
+_STREAM_TASK = """Explain the topic "{topic}" the way a brilliant tutor explains it to a peer who has never seen it before. Ground every claim in the NOTES.
+
+Write 4-10 sentences of plain, flowing prose with a clear progression:
+1) anchor — what kind of thing this is and where it sits in the subject;
+2) intuition — the mental picture, in everyday language;
+3) mechanism — how it actually works, using the NOTES' own terminology (define any jargon the first time it appears);
+4) why-it-matters — the consequence, contrast, or use-case the NOTES highlight.
+
+Use second person ("you"). Confident, no hedging, no "essentially"/"basically". If the NOTES don't cover the topic, say so plainly in one sentence.
+
+OUTPUT: plain prose only — no JSON, no markdown, no headings, no bullet lists, no "Sure!"/"Great question!". Just the explanation text.
+
+NOTES:
+{context}"""
+
+EXPLANATION_STREAM_PROMPT = ChatPromptTemplate.from_messages([
+    ("system", GROUNDED_SYSTEM_PROSE),
+    ("user", _STREAM_TASK),
 ])

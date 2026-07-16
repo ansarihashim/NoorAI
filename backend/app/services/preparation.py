@@ -174,6 +174,25 @@ def delete_questions(doc_ids: list[str]) -> bool:
         return False
 
 
+def save_questions(doc_ids: list[str], items: list[dict], *, title: str) -> None:
+    """Persist a streamed important-questions set to the SAME on-disk cache the
+    generate/get endpoints use, so a later visit is served from cache. Coerces
+    the streamed item dicts into ImportantQuestionSet (capped to the schema max);
+    logs and no-ops on any validation/IO error since the stream already
+    succeeded."""
+    try:
+        qs = ImportantQuestionSet(title=title, questions=items[:20])
+    except Exception:
+        logger.exception("preparation: cannot cache streamed questions for %s", doc_ids)
+        return
+    try:
+        _path(_set_key(doc_ids), "questions").write_text(
+            qs.model_dump_json(), encoding="utf-8"
+        )
+    except Exception:
+        logger.exception("preparation: failed to write questions stream cache")
+
+
 async def generate_questions(
     doc_ids: list[str],
     *,
@@ -341,6 +360,6 @@ async def generate_explanation(
 
 __all__ = [
     "generate_overview", "load_overview", "delete_overview",
-    "generate_questions", "load_questions", "delete_questions",
+    "generate_questions", "load_questions", "delete_questions", "save_questions",
     "generate_explanation", "load_explanation",
 ]

@@ -1,7 +1,7 @@
 """Prompt template for the Preparation important-questions chain (multi-doc)."""
 from langchain_core.prompts import ChatPromptTemplate
 
-from app.rag.prompts.system import GROUNDED_SYSTEM
+from app.rag.prompts.system import GROUNDED_SYSTEM, GROUNDED_SYSTEM_STREAM
 
 _TASK = """Write the {n} most exam-worthy questions for the material in the NOTES — the questions a top student would predict will appear on the paper.
 
@@ -52,4 +52,40 @@ Return ONLY the JSON object — no prose, no markdown fences."""
 IMPORTANT_QUESTIONS_PROMPT = ChatPromptTemplate.from_messages([
     ("system", GROUNDED_SYSTEM),
     ("user", _TASK),
+])
+
+
+# --- Streaming (JSONL) variant -------------------------------------------------
+# Same guidance, but one question JSON object per line so the server can forward
+# each as it lands. Literal JSON braces are doubled for the template engine.
+_STREAM_TASK = """Write the {n} most exam-worthy questions for the material in the NOTES — the questions a top student would predict will appear on the paper.
+
+The NOTES may come from multiple documents — each chunk is prefixed with [<doc_id>#<chunk_idx>] so you can cite specific sources.
+
+Each question object has:
+- `question`: a clean, self-contained exam question.
+- `answer`: 2-6 sentences; a precise model answer in the NOTES' terminology.
+- `type`: one of "recall" | "apply" | "analyze" | "evaluate".
+- `confidence`: 0.0-1.0, scored honestly.
+- `chunks`: array of {{"doc_id": "...", "chunk_idx": <int>}} grounding the question (at least one).
+
+DESIGN GUIDELINES:
+- Spread coverage across the whole syllabus; don't cluster on one chunk or topic.
+- Mix cognitive depth — at least a third apply/analyze/evaluate.
+- Target non-obvious content; skip trivia and any question you can't answer cleanly from the NOTES.
+
+STREAMING OUTPUT (read carefully):
+- Emit each question as a SEPARATE JSON object on its OWN line (JSON Lines). One object, a newline, the next object.
+- Do NOT wrap them in an array or a top-level object. No prose, no markdown fences, no blank lines.
+- Each line must be exactly one JSON object with these keys:
+  {{"question": "...", "answer": "...", "type": "recall|apply|analyze|evaluate", "confidence": 0.7, "chunks": [{{"doc_id": "...", "chunk_idx": 0}}]}}
+
+NOTES:
+{context}
+
+Begin now — one question JSON object per line, nothing else."""
+
+IMPORTANT_QUESTIONS_STREAM_PROMPT = ChatPromptTemplate.from_messages([
+    ("system", GROUNDED_SYSTEM_STREAM),
+    ("user", _STREAM_TASK),
 ])
