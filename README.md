@@ -1,195 +1,360 @@
-# EchoVerse
+# NoorAI
 
-> Real-Time Bidirectional AI Voice Agent — your "group study with AI" partner.
-> Upload notes → it narrates aloud → interrupt anytime to ask questions → narration auto-resumes.
+> **Your AI-powered study and revision companion.**
+>
+> Turn lengthy study material into **short notes, structured summaries, flowcharts, visual explanations, and AI-generated audio narration** — making revision faster, easier, and more effective.
 
-**Stack:** React (JS) + Vite + Tailwind · FastAPI + WebSockets · faster-whisper (local CPU) · Groq · ElevenLabs (+ Google TTS fallback) · FAISS · PostgreSQL.
+## 📚 About NoorAI
 
-See [PLAN.md](./PLAN.md) for the architecture, phased build plan, and design rationale.
+**NoorAI** is an AI-powered learning and revision platform designed to help students transform lengthy and difficult study material into **simple, structured, and revision-friendly content**.
 
----
+Studying from large PDFs, textbooks, lecture notes, and other learning materials can be time-consuming. Students often spend more time **organizing and understanding their material** than actually revising it. NoorAI addresses this problem by transforming uploaded study material into multiple learning formats that make important concepts easier to understand, remember, and revise.
 
-## Prerequisites
+Instead of repeatedly going through dozens or hundreds of pages, NoorAI helps students create a **compact revision environment** from their existing study material.
 
-```powershell
-winget install Python.Python.3.11
-winget install OpenJS.NodeJS.LTS
-winget install Gyan.FFmpeg            # REQUIRED by Whisper
-```
+### 🎯 The core idea
 
-Verify in a **fresh** PowerShell:
-```powershell
-python --version    # 3.11.x
-node --version      # v20.x
-ffmpeg -version
-```
+**Upload your study material → Understand it → Condense it → Visualize it → Listen to it → Revise it**
 
-You also need API keys (free tiers all work):
-- **Groq** — https://console.groq.com/keys
-- **ElevenLabs** — https://elevenlabs.io/app/settings/api-keys
-- **Google Cloud TTS** (fallback) — enable Text-to-Speech API → service-account JSON or API key
-- **Postgres** — https://neon.tech free tier
+NoorAI can transform study material into:
 
----
+* 📝 **Short Notes** — concise, exam-oriented summaries of important concepts
+* 📌 **Key Points** — important facts, definitions, concepts, and takeaways
+* 🔄 **Flowcharts** — visualize processes, sequences, and relationships between concepts
+* 🧠 **AI Explanations** — simplify complex topics into easier-to-understand explanations
+* 🎧 **Audio Narration** — listen to your study material instead of reading everything
+* 📚 **Structured Revision Material** — organize large documents into manageable sections
+* 🔎 **Context-aware Information Retrieval** — retrieve relevant information from uploaded documents
+* 📊 **Visual Learning Aids** — make complicated information easier to comprehend
+* 🔁 **Revision Support** — revisit important concepts without repeatedly reading the original material
 
-## One-time local setup
+The goal is not simply to summarize a document.
 
-### Backend
-```powershell
-cd backend
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-
-copy .env.example .env
-# Edit .env with your API keys + DATABASE_URL
-
-# Pre-download the Whisper model (~140MB, runs once)
-python -m app.scripts.download_whisper
-
-# Apply DB schema
-alembic -c alembic.ini upgrade head
-```
-
-### Frontend
-```powershell
-cd ..\frontend
-npm install
-copy .env.example .env
-# Defaults point to http://localhost:8000 — change only if you moved the backend
-```
+The goal is to **turn passive reading into an efficient revision experience**.
 
 ---
 
-## Run dev servers (two terminals)
+## 💡 Why NoorAI?
 
-**Terminal 1 — backend** (run from `backend/`, the `app.` package is at the root):
-```powershell
-cd C:\Users\hashi\Desktop\eco\backend
-.\.venv\Scripts\Activate.ps1
-uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+Traditional revision often looks like this:
+
+```text
+Large PDF / Textbook
+        ↓
+Read Everything
+        ↓
+Find Important Information
+        ↓
+Make Notes
+        ↓
+Organize Notes
+        ↓
+Create Diagrams
+        ↓
+Revise
+        ↓
+Forget Something
+        ↓
+Go Back to the Original Material
+        ↓
+Repeat
 ```
 
-**Terminal 2 — frontend:**
-```powershell
-cd C:\Users\hashi\Desktop\eco\frontend
-npm run dev
+This process is repetitive and time-consuming.
+
+NoorAI aims to simplify this workflow:
+
+```text
+                 ┌──────────────────┐
+                 │  Study Material  │
+                 │   PDF / Notes    │
+                 └────────┬─────────┘
+                          ↓
+                 ┌──────────────────┐
+                 │      NoorAI      │
+                 │   AI Processing  │
+                 └────────┬─────────┘
+                          ↓
+       ┌──────────────────┼──────────────────┐
+       ↓                  ↓                  ↓
+ ┌───────────┐      ┌───────────┐      ┌───────────┐
+ │ Short     │      │ Flowcharts│      │ Key Points│
+ │ Notes     │      │ & Visuals │      │ & Concepts│
+ └─────┬─────┘      └─────┬─────┘      └─────┬─────┘
+       │                  │                  │
+       └──────────────────┼──────────────────┘
+                          ↓
+                 ┌──────────────────┐
+                 │  Easy Revision   │
+                 │  & Understanding │
+                 └────────┬─────────┘
+                          ↓
+                 ┌──────────────────┐
+                 │ Better Learning  │
+                 │   Experience     │
+                 └──────────────────┘
 ```
 
-Open http://localhost:5173, sign up, upload a PDF, then start narration or ask a doubt.
+This allows students to spend less time **searching, organizing, and condensing information** and more time **understanding and revising it**.
 
 ---
 
-## Project layout
+## ✨ Key Features
 
+### 📝 Short Notes
+
+Long chapters and documents are transformed into concise notes containing the most important information.
+
+Instead of revisiting an entire chapter, students can quickly review the essential concepts.
+
+Short notes are particularly useful for:
+
+* Last-minute revision
+* Exam preparation
+* Quick topic review
+* Revisiting previously studied material
+* Identifying the most important concepts in a chapter
+
+---
+
+### 🔄 Flowcharts
+
+Some concepts are easier to understand visually than through paragraphs of text.
+
+NoorAI can convert suitable topics and processes into structured **flowcharts**, helping students understand:
+
+* Processes
+* Sequences
+* Decision paths
+* Cause-and-effect relationships
+* Step-by-step procedures
+* Concept relationships
+
+This makes complicated topics easier to visualize and recall.
+
+---
+
+### 🧠 Simplified AI Explanations
+
+Academic material can often be unnecessarily complicated.
+
+NoorAI uses AI to explain concepts in a simpler and more accessible way while maintaining the context of the original study material.
+
+The objective is to answer the question:
+
+> **"How can this topic be explained so that I can understand it quickly?"**
+
+This is especially useful when the original material contains:
+
+* Complex terminology
+* Long explanations
+* Dense paragraphs
+* Technical concepts
+* Difficult-to-follow descriptions
+
+---
+
+### 📌 Key Points & Important Concepts
+
+Instead of manually identifying what matters in a chapter, NoorAI can highlight the important information.
+
+This can include:
+
+* Definitions
+* Important facts
+* Core concepts
+* Formulas
+* Processes
+* Important relationships
+* Exam-relevant information
+* Major takeaways
+
+The result is a much more focused revision experience.
+
+---
+
+### 🎧 AI Audio Narration
+
+NoorAI can convert generated study content into audio narration.
+
+This allows students to revise while:
+
+* Walking
+* Travelling
+* Taking a break from the screen
+* Doing routine activities
+* Reviewing material away from their desk
+
+Audio narration provides another way of consuming the same study material without having to continuously read from a screen.
+
+---
+
+### 📚 Document-Based Learning
+
+NoorAI is designed around the student's own study material.
+
+Students can upload documents such as:
+
+* Lecture notes
+* Study PDFs
+* Course material
+* Textbooks
+* Reference documents
+* Academic notes
+
+The system processes the uploaded material and uses it as the foundation for generating revision content.
+
+This helps keep generated information **relevant to the student's actual source material**.
+
+---
+
+### 🔎 Intelligent Retrieval
+
+NoorAI uses a retrieval-based architecture to find relevant information from uploaded documents.
+
+Large documents are processed into smaller chunks and indexed so that relevant information can be retrieved when generating summaries, explanations, and other learning content.
+
+This allows the AI system to work with significantly larger study materials while maintaining contextual relevance.
+
+---
+
+## 🏗️ How NoorAI Works
+
+At a high level, the platform follows this workflow:
+
+```text
+User Uploads Study Material
+            ↓
+       Document Processing
+            ↓
+        Text Extraction
+            ↓
+        Text Chunking
+            ↓
+      Vector Embeddings
+            ↓
+       FAISS Indexing
+            ↓
+      Relevant Retrieval
+            ↓
+        Groq LLM
+            ↓
+   ┌────────┼───────────┐
+   ↓        ↓           ↓
+Notes   Flowcharts   Explanations
+   │        │           │
+   └────────┼───────────┘
+            ↓
+      Revision Workspace
+            ↓
+       Audio Narration
 ```
-eco/
-├── README.md
-├── .gitignore
-│
-├── frontend/                       Vercel target
-│   ├── public/pcm-capture.js       AudioWorklet (16 kHz int16 PCM downsampler)
-│   ├── src/
-│   │   ├── components/             Workspace, preparation, revision, session, marketing, ui
-│   │   ├── hooks/                  useWebSocket, useMicStream, useAudioPlayer, useAudio…
-│   │   ├── lib/                    api.js, auth.jsx, citations.jsx, sanitize.js, sound.jsx
-│   │   └── pages/                  Landing, Login, Signup, Library, Settings, Session, NotFound
-│   ├── index.html
-│   ├── package.json
-│   ├── vite.config.js
-│   ├── tailwind.config.js
-│   ├── postcss.config.js
-│   ├── vercel.json                 SPA rewrite + cache headers + security headers
-│   └── .env.example                VITE_API_URL + VITE_WS_URL
-│
-└── backend/                        Render target
-    ├── app/                        the Python package (`app.main:app`)
-    │   ├── main.py                 FastAPI app, CORS, security headers, routers
-    │   ├── core/                   pydantic-settings
-    │   ├── api/                    REST routers (auth, upload, documents, llm, tts,
-    │   │                              narration, podcast, visuals, preparation,
-    │   │                              revision, voices)
-    │   ├── websocket/audio.py      /ws/audio handler with JWT-in-query + origin check
-    │   ├── auth/                   JWT + password + dependency helpers
-    │   ├── services/               groq, tts, whisper, narration, podcast, visual,
-    │   │                              session FSM, preparation, revision
-    │   ├── rag/                    FAISS service, retriever, chunker, chains,
-    │   │                              graphs, prompts, schemas
-    │   ├── models/                 User, Document, Session, Message
-    │   ├── db/                     async engine, alembic env, 3 migrations
-    │   ├── utils/                  vad, rate_limit, security_input, security_middleware,
-    │   │                              audio_utils, voices_catalog
-    │   └── scripts/download_whisper.py
-    ├── alembic.ini
-    ├── requirements.txt
-    ├── runtime.txt                 Python 3.11.9 pin for Render
-    ├── render.yaml                 Render Blueprint (build + start + env vars)
-    ├── Dockerfile                  optional, for local Docker / non-Render hosts
-    └── .env.example
+
+The architecture combines **document processing, retrieval-augmented generation, large language models, text-to-speech, and a modern web interface** to create a unified study environment.
+
+---
+
+## 🧩 Technology Stack
+
+| Layer               | Technology             |
+| ------------------- | ---------------------- |
+| Frontend            | React.js               |
+| Build Tool          | Vite                   |
+| Styling             | Tailwind CSS           |
+| Backend             | FastAPI                |
+| Communication       | REST APIs + WebSockets |
+| Speech Recognition  | faster-whisper         |
+| LLM                 | Groq                   |
+| Text-to-Speech      | ElevenLabs             |
+| TTS Fallback        | Google TTS / Edge-TTS  |
+| Vector Search       | FAISS                  |
+| Database            | PostgreSQL             |
+| Database Hosting    | Neon                   |
+| Frontend Deployment | Vercel                 |
+| Backend Deployment  | Render                 |
+
+---
+
+## 🚀 What Makes NoorAI Different?
+
+NoorAI is designed around a simple principle:
+
+> **Revision should not require repeatedly going through the entire learning material.**
+
+The platform combines multiple learning formats in one place.
+
+A student can take a large document and progressively transform it into:
+
+```text
+                    Original Material
+                           │
+                           ↓
+                    ┌─────────────┐
+                    │   Summary   │
+                    └──────┬──────┘
+                           ↓
+                 ┌───────────────────┐
+                 │    Short Notes    │
+                 └─────────┬─────────┘
+                           ↓
+             ┌─────────────┴─────────────┐
+             ↓                           ↓
+      ┌─────────────┐             ┌─────────────┐
+      │  Flowcharts │             │ Key Concepts│
+      └──────┬──────┘             └──────┬──────┘
+             │                           │
+             └─────────────┬─────────────┘
+                           ↓
+                  ┌────────────────┐
+                  │   AI Explained  │
+                  └───────┬────────┘
+                          ↓
+                  ┌────────────────┐
+                  │ Audio Narration│
+                  └───────┬────────┘
+                          ↓
+                  ┌────────────────┐
+                  │    REVISION    │
+                  └────────────────┘
 ```
 
----
+This gives students **multiple ways to learn the same concept**:
 
-## Production deployment
-
-### Prerequisites (free tier on every line)
-
-| Component | Provider | Notes |
-|---|---|---|
-| Frontend | **Vercel** | free, auto-deploy on push |
-| Backend  | **Render** | free Web Service plan (512 MB RAM, spins down after 15 min idle, no disk) |
-| Database | **Neon**   | free Postgres, 0.5 GB |
-| LLM      | **Groq**   | free tier, rate-limited |
-| TTS      | **Edge-TTS** (Microsoft) | free, no API key — used automatically when ElevenLabs/Google envs are blank |
-
-### Deploy the backend (Render)
-
-1. Push the repo to GitHub.
-2. Render Dashboard → New → Blueprint → connect this repo. Render reads `backend/render.yaml`.
-3. Fill in the `sync: false` env vars in the prompt:
-   - `GROQ_API_KEY` — from console.groq.com
-   - `DATABASE_URL` — your Neon string in `postgresql+asyncpg://user:pass@host/db?ssl=require` form
-   - `CORS_ORIGINS` — your Vercel URL (set once it's live; can revisit)
-   - `FRONTEND_URL` — same Vercel URL
-4. Click Create. Build takes 6–10 minutes (Whisper + sentence-transformers pre-download + alembic upgrade).
-5. Once green: `curl https://<service>.onrender.com/healthz` → `{"ok":true}`.
-
-The blueprint already sets `WHISPER_MODEL=tiny.en` and `STORAGE_DIR=/tmp/storage` for the 512 MB free tier. FAISS indices and chunks are mirrored to the `rag_indices` table in Postgres on every upload, so uploaded documents survive the every-15-minute disk wipe.
-
-### Deploy the frontend (Vercel)
-
-1. Vercel Dashboard → New Project → import the same GitHub repo.
-2. Settings:
-   - Root Directory: `frontend`
-   - Framework: Vite (auto-detected)
-   - Build Command: `npm run build`
-   - Output Directory: `dist`
-3. Environment Variables (Production):
-   - `VITE_API_URL` = `https://<service>.onrender.com`
-   - `VITE_WS_URL`  = `wss://<service>.onrender.com/ws/audio`
-4. Deploy. Then go back to Render and set `CORS_ORIGINS` to the Vercel URL → Manual Deploy → Clear build cache & deploy.
-
-### Verification (post-deploy)
-
-1. `curl https://<service>.onrender.com/healthz` → `{"ok":true}`
-2. Open the Vercel URL → sign up → upload a 1-3 page PDF
-3. Wait 16 minutes (forces a Render cold start) → reopen the doc → Overview still generates → confirms FAISS-in-Postgres hydration is working
-4. Click Ask-a-doubt → speak → audio reply plays → confirms wss:// upgrade through Render's edge + mic worklet + Whisper
+**Read it → Understand it → Visualize it → Listen to it → Revise it**
 
 ---
 
-## Troubleshooting
+## 🎓 Designed for Students
 
-| Symptom | Likely cause |
-|---|---|
-| Whisper hangs / silent failure | `ffmpeg` not on PATH |
-| `cannot import name 'AsyncGroq'` | old `groq` package — `pip install -U groq` |
-| MediaSource won't open in browser | needs HTTPS in production (or `localhost` in dev) |
-| "no audio after Start" | autoplay blocked — make sure Start is triggered by a click |
-| Whisper download fails | first run needs internet; after that the model is cached |
+NoorAI is particularly useful for students who need to process large amounts of academic material within limited time.
+
+It can be useful for:
+
+* University students
+* Competitive-exam aspirants
+* Technical students
+* Students preparing from PDFs and lecture notes
+* Learners revising large subjects
+* Anyone who wants to convert lengthy material into concise revision resources
+
+Whether the goal is **learning a new topic or revising something already studied**, NoorAI provides a structured environment for working with study material.
 
 ---
 
-## License
+## 🌟 The Vision
 
-MIT (or your choice — see PLAN.md §11 for what's out of scope).
+The long-term vision of NoorAI is to become an **AI-powered personal learning environment** where students do not have to manage their study material manually.
+
+Instead of:
+
+> **Read → Highlight → Write Notes → Draw Diagrams → Revise**
+
+the experience becomes:
+
+> **Upload → Understand → Organize → Visualize → Revise**
+
+NoorAI aims to make studying **simpler, more structured, and more efficient** by allowing AI to handle the repetitive work involved in preparing revision material.
+
+The student can then focus on what matters most:
+
+> **Understanding the subject and remembering it.**
